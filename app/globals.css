@@ -1,0 +1,94 @@
+@import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;500;600;700&family=Merriweather:wght@300;400;700&family=Playfair+Display:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer utilities {
+  .theme-minimal {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f9fafb;
+    --text-primary: #111827;
+    --text-secondary: #6b7280;
+    --accent: #3b82f6;
+    --accent-hover: #2563eb;
+  }
+
+  .theme-vintage {
+    --bg-primary: #f5f1e8;
+    --bg-secondary: #ede8dc;
+    --text-primary: #2c1810;
+    --text-secondary: #5c4a3a;
+    --accent: #c9a982;
+    --accent-hover: #b8956f;
+  }
+
+  .theme-scrapbook {
+    --bg-primary: #fffef9;
+    --bg-secondary: #fcf8f3;
+    --text-primary: #2d2926;
+    --text-secondary: #6b6358;
+    --accent: #e8b4a0;
+    --accent-hover: #d89d88;
+  }
+
+  .theme-storybook {
+    --bg-primary: #fefefe;
+    --bg-secondary: #f5f5f5;
+    --text-primary: #1a1a1a;
+    --text-secondary: #4a4a4a;
+    --accent: #8b5cf6;
+    --accent-hover: #7c3aed;
+  }
+
+  .handwriting {
+    font-family: 'Dancing Script', cursive;
+  }
+
+  .letter-paper {
+    background: linear-gradient(to bottom, 
+      rgba(245, 241, 232, 0.3) 0%,
+      rgba(245, 241, 232, 0.1) 100%);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .vintage-paper {
+    background: 
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 31px,
+        rgba(200, 169, 130, 0.1) 31px,
+        rgba(200, 169, 130, 0.1) 32px
+      ),
+      #f5f1e8;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}

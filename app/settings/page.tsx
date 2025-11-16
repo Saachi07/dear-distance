@@ -1,0 +1,221 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useUser } from '../providers'
+import { createSupabaseClient } from '@/lib/supabase/client'
+import { Settings as SettingsIcon, User, Mail, Heart, Palette, Save } from 'lucide-react'
+
+interface Profile {
+  id: string
+  email: string
+  display_name: string | null
+  partner_id: string | null
+  theme_preference: string
+}
+
+export default function SettingsPage() {
+  const { user, setTheme, theme } = useUser()
+  const supabase = createSupabaseClient()
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [displayName, setDisplayName] = useState('')
+  const [partnerEmail, setPartnerEmail] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+
+  const themes = [
+    { id: 'minimal', name: 'Minimal', color: '#ffffff' },
+    { id: 'vintage', name: 'Vintage Paper', color: '#f5f1e8' },
+    { id: 'scrapbook', name: 'Scrapbook', color: '#fffef9' },
+    { id: 'storybook', name: 'Storybook', color: '#fefefe' },
+  ]
+
+  useEffect(() => {
+    if (user) {
+      loadProfile()
+    }
+  }, [user])
+
+  const loadProfile = async () => {
+    if (!user) return
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single()
+
+    if (error) {
+      console.error('Error loading profile:', error)
+    } else if (data) {
+      setProfile(data)
+      setDisplayName(data.display_name || '')
+      
+      if (data.partner_id) {
+        const { data: partner } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('id', data.partner_id)
+          .single()
+        
+        if (partner) {
+          setPartnerEmail(partner.email)
+        }
+      }
+    }
+    setLoading(false)
+  }
+
+  const handleSave = async () => {
+    if (!user) return
+
+    setSaving(true)
+
+    try {
+      let partnerId = profile?.partner_id || null
+
+      // If partner email provided and different from current
+      if (partnerEmail && partnerEmail !== profile?.email) {
+        const { data: partner } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('email', partnerEmail)
+          .single()
+
+        if (partner) {
+          partnerId = partner.id
+
+          // Also update partner's profile to link back
+          await supabase
+            .from('profiles')
+            .update({ partner_id: user.id })
+            .eq('id', partner.id)
+        } else {
+          alert('Partner email not found')
+          setSaving(false)
+          return
+        }
+      }
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          display_name: displayName,
+          partner_id: partnerId,
+          theme_preference: theme,
+        })
+        .eq('id', user.id)
+
+      if (error) throw error
+
+      alert('Settings saved!')
+      loadProfile()
+    } catch (error: any) {
+      console.error('Error saving settings:', error)
+      alert(error.message || 'Failed to save settings')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-pulse text-rose-gold">
+          <SettingsIcon className="w-16 h-16" />
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-soft-pink via-white to-dusty-blue py-8 px-4 pb-24 md:pb-8">
+      <div className="container mx-auto max-w-2xl">
+        <div className="mb-8">
+          <h1 className="text-4xl font-handwriting text-vintage-ink mb-2">Settings</h1>
+          <p className="text-vintage-ink/70">Manage your account and preferences</p>
+        </div>
+
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-8 space-y-6">
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium text-vintage-ink mb-2">
+              <User className="w-4 h-4" />
+              Display Name
+            </label>
+            <input
+              type="text"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              className="w-full px-4 py-3 border border-vintage-ink/20 rounded-lg focus:ring-2 focus:ring-rose-gold focus:border-transparent outline-none"
+              placeholder="Your name"
+            />
+          </div>
+
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium text-vintage-ink mb-2">
+              <Mail className="w-4 h-4" />
+              Email
+            </label>
+            <input
+              type="email"
+              value={profile?.email || ''}
+              disabled
+              className="w-full px-4 py-3 border border-vintage-ink/20 rounded-lg bg-vintage-paper/30 cursor-not-allowed"
+            />
+          </div>
+
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium text-vintage-ink mb-2">
+              <Heart className="w-4 h-4" />
+              Partner Email
+            </label>
+            <input
+              type="email"
+              value={partnerEmail}
+              onChange={(e) => setPartnerEmail(e.target.value)}
+              className="w-full px-4 py-3 border border-vintage-ink/20 rounded-lg focus:ring-2 focus:ring-rose-gold focus:border-transparent outline-none"
+              placeholder="partner@email.com"
+            />
+            <p className="mt-1 text-xs text-vintage-ink/60">
+              Enter your partner's email to connect accounts
+            </p>
+          </div>
+
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium text-vintage-ink mb-4">
+              <Palette className="w-4 h-4" />
+              Theme
+            </label>
+            <div className="grid grid-cols-2 gap-4">
+              {themes.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setTheme(t.id)}
+                  className={`p-4 border-2 rounded-lg transition-all text-left ${
+                    theme === t.id
+                      ? 'border-rose-gold bg-rose-gold/10'
+                      : 'border-vintage-ink/20 hover:border-rose-gold/50'
+                  }`}
+                >
+                  <div
+                    className="w-full h-8 rounded mb-2"
+                    style={{ backgroundColor: t.color }}
+                  />
+                  <span className="font-semibold text-vintage-ink">{t.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-rose-gold text-white rounded-lg font-semibold hover:bg-rose-gold/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Save className="w-5 h-5" />
+            {saving ? 'Saving...' : 'Save Settings'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
