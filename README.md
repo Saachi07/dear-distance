@@ -1,54 +1,54 @@
-# Letters 💕
+# Letters 
 
 A personal, intimate letter-sharing website for long-distance partners. Create beautiful letters with photos, voice recordings, videos, and music. Build shared memories, journal together, and count down to special moments—no matter the distance.
 
-## ✨ Features
+##  Features
 
-### 📝 Rich Letter Editor
+###  Rich Letter Editor
 - Rich text editing with TipTap (bold, italic, headings, lists, quotes)
 - Insert photos, videos, and audio recordings
 - Embed music from Spotify and SoundCloud
 - Handwriting-style fonts for that personal touch
 - Beautiful, paper-like backgrounds
 
-### 🔒 Security & Privacy
+###  Security & Privacy
 - End-to-end encryption for all letter content
 - Password protection for individual letters
 - Private and unlisted visibility options
 - Scheduled letter reveals (unlock at a specific date/time)
 - Secure authentication with Supabase
 
-### 💌 Letter Experience
+###  Letter Experience
 - Envelope-opening animation when viewing letters
 - Confetti and hearts animations for special moments
 - Read-aloud mode with text-to-speech
 - Smooth, emotional animations with Framer Motion
 
-### 📚 Shared Journal
+###  Shared Journal
 - Write back and forth with your partner
 - Thread-style conversation view
 - Real-time updates
 - Perfect for daily thoughts and feelings
 
-### 🖼 Memory Gallery
+###  Memory Gallery
 - Shared timeline of photos, quotes, and moments
 - Tag memories for easy organization
 - Date-based organization
 - Beautiful card-based layout
 
-### ⏰ Countdown Timers
+###  Countdown Timers
 - Track special dates together (reunions, anniversaries, etc.)
 - Real-time countdown display
 - Multiple countdowns support
 - Beautiful gradient cards
 
-### 🎨 Themes
+###  Themes
 - **Minimal**: Clean and modern
 - **Vintage Paper**: Warm, nostalgic paper feel
 - **Scrapbook**: Cozy scrapbook aesthetic
 - **Storybook**: Elegant storybook style
 
-## 🛠 Tech Stack
+##  Tech Stack
 
 - **Frontend**: Next.js 14, React, TypeScript
 - **Styling**: Tailwind CSS, Custom CSS
@@ -60,7 +60,7 @@ A personal, intimate letter-sharing website for long-distance partners. Create b
 - **Authentication**: Supabase Auth
 - **Encryption**: CryptoJS (AES encryption)
 
-## 📋 Prerequisites
+##  Prerequisites
 
 Before you begin, ensure you have:
 
@@ -68,7 +68,7 @@ Before you begin, ensure you have:
 - A Supabase account ([supabase.com](https://supabase.com))
 - npm or yarn package manager
 
-## 🚀 Setup Instructions
+##  Setup Instructions
 
 ### 1. Clone and Install
 
@@ -136,7 +136,7 @@ yarn dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 letters/
@@ -162,7 +162,7 @@ letters/
 └── README.md              # This file
 ```
 
-## 🔐 Security Notes
+##  Security Notes
 
 - **Encryption**: All letter content is encrypted using AES encryption before storage
 - **Password Protection**: Letter passwords are hashed using SHA-256
@@ -176,7 +176,7 @@ letters/
 - Review and test RLS policies
 - Consider using Supabase Vault for managing encryption keys
 
-## 📱 Features Walkthrough
+##  Features Walkthrough
 
 ### Creating a Letter
 
@@ -215,7 +215,7 @@ letters/
 2. Watch it count down in real-time
 3. Celebrate when it reaches zero!
 
-## 🎨 Customization
+##  Customization
 
 ### Themes
 
@@ -257,18 +257,18 @@ The app can be deployed anywhere Next.js is supported:
 
 **Note**: Make sure to set up environment variables in your deployment platform.
 
-## 🤝 Contributing
+##  Contributing
 
 This is a personal project, but suggestions and improvements are welcome!
 
-## 📝 License
+##  License
 
 See LICENSE file for details.
 
-## 💝 Acknowledgments
+##  Acknowledgments
 
-Built with love for long-distance couples everywhere. 💕
+Built with love for long-distance couples everywhere. 
 
 ---
 
-**Made with 💕 for keeping connections strong across any distance**
+**Made with love for keeping connections strong across any distance**
