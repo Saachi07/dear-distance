@@ -11,3 +11,4 @@ if (Test-Path .next) {
 Write-Host "Starting dev server..." -ForegroundColor Green
 npm run dev
 
+
