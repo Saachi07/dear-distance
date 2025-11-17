@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { useUser } from '../providers'
 import { createSupabaseClient } from '@/lib/supabase/client'
 import { 
-  Heart, Mail, BookOpen, Images, Clock, Settings, 
+  Heart, Mail, BookOpen, ImageIcon, Clock, Settings, 
   Plus, LogOut, User, ArrowRight 
 } from 'lucide-react'
 
@@ -167,7 +167,7 @@ export default function DashboardPage() {
           >
             <div className="flex items-start justify-between mb-4">
               <div className="p-3 bg-rose-gold/10 rounded-lg">
-                <Images className="w-6 h-6 text-rose-gold" />
+                <ImageIcon className="w-6 h-6 text-rose-gold" />
               </div>
               <ArrowRight className="w-5 h-5 text-vintage-ink/40 group-hover:text-rose-gold group-hover:translate-x-1 transition-all" />
             </div>

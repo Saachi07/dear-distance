@@ -6,10 +6,11 @@
 
 @layer base {
   * {
-    @apply border-border;
+    border-color: inherit;
   }
   body {
-    @apply bg-background text-foreground;
+    background-color: var(--bg-primary, #ffffff);
+    color: var(--text-primary, #111827);
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
