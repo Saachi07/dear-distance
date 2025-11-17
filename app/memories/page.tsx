@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useUser } from '@/app/providers'
 import { createSupabaseClient } from '@/lib/supabase/client'
-import { Images, Plus, Heart, Calendar } from 'lucide-react'
+import { ImageIcon, Plus, Heart, Calendar } from 'lucide-react'
 import { format } from 'date-fns'
 import Image from 'next/image'
 
@@ -123,7 +123,7 @@ export default function MemoriesPage() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-pulse text-rose-gold">
-          <Images className="w-16 h-16" />
+          <ImageIcon className="w-16 h-16" />
         </div>
       </div>
     )
@@ -221,7 +221,7 @@ export default function MemoriesPage() {
 
         {memories.length === 0 ? (
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-12 text-center">
-            <Images className="w-16 h-16 mx-auto text-rose-gold mb-4" />
+            <ImageIcon className="w-16 h-16 mx-auto text-rose-gold mb-4" />
             <h2 className="text-2xl font-semibold text-vintage-ink mb-2">No memories yet</h2>
             <p className="text-vintage-ink/70">Start building your shared timeline!</p>
           </div>

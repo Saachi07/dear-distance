@@ -21,6 +21,19 @@ export default function SignupPage() {
     setError('')
 
     try {
+      // First check if email already exists
+      const { data: existingUser } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', email)
+        .single()
+
+      if (existingUser) {
+        setError('This email is already registered. Please sign in instead.')
+        setLoading(false)
+        return
+      }
+
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
@@ -31,24 +44,60 @@ export default function SignupPage() {
         },
       })
 
-      if (signUpError) throw signUpError
-
-      if (data.user) {
-        // Create profile
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: data.user.id,
-            email: email,
-            display_name: displayName,
+      if (signUpError) {
+        // Try signing in — user may already exist with same credentials
+        try {
+          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+            email,
+            password,
           })
 
-        if (profileError) throw profileError
+          if (signInError) {
+            // Provide clearer guidance for common messages
+            const msg = signInError.message || ''
+            if (msg.includes('Invalid login credentials') || msg.includes('Invalid password')) {
+              setError('Invalid credentials. If you already have an account, try resetting your password.')
+            } else if (msg.includes('already registered') || msg.includes('User already exists')) {
+              setError('This email is already registered. Please sign in instead.')
+            } else {
+              // Unknown sign-in error — fall back to showing signUp error
+              throw signUpError
+            }
+            return
+          }
+
+          if (signInData?.user) {
+            // Signed in successfully — redirect
+            router.push('/dashboard')
+            router.refresh()
+            return
+          }
+        } catch (siErr) {
+          console.error('Sign-in fallback error:', siErr)
+          throw signUpError
+        }
+      }
+
+      if (data.user) {
+        // Create profile using RPC to bypass RLS
+        const { error: profileError } = await supabase
+          .rpc('create_user_profile', {
+            user_id: data.user.id,
+            user_email: email,
+            user_display_name: displayName,
+          })
+
+        if (profileError) {
+          setError('Account created but profile setup failed. Please sign in and complete your profile.')
+          console.error('Profile creation error:', profileError)
+          return
+        }
 
         router.push('/dashboard')
         router.refresh()
       }
     } catch (err: any) {
+      console.error('Signup error:', err)
       setError(err.message || 'Failed to sign up')
     } finally {
       setLoading(false)

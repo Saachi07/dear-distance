@@ -28,19 +28,6 @@ CREATE TABLE IF NOT EXISTS letters (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()) NOT NULL
 );
 
--- Media table (photos, videos, audio)
-CREATE TABLE IF NOT EXISTS media (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  letter_id UUID REFERENCES letters(id) ON DELETE CASCADE,
-  journal_entry_id UUID REFERENCES journal_entries(id) ON DELETE CASCADE,
-  memory_id UUID REFERENCES memories(id) ON DELETE CASCADE,
-  type TEXT NOT NULL CHECK (type IN ('photo', 'video', 'audio', 'music_embed')),
-  url TEXT NOT NULL,
-  thumbnail_url TEXT,
-  metadata JSONB, -- Store additional info like duration, dimensions, etc.
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()) NOT NULL
-);
-
 -- Journal entries (shared thread)
 CREATE TABLE IF NOT EXISTS journal_entries (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -63,6 +50,19 @@ CREATE TABLE IF NOT EXISTS memories (
   tags TEXT[],
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()) NOT NULL
+);
+
+-- Media table (photos, videos, audio) - must be created after letters, journal_entries, and memories
+CREATE TABLE IF NOT EXISTS media (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  letter_id UUID REFERENCES letters(id) ON DELETE CASCADE,
+  journal_entry_id UUID REFERENCES journal_entries(id) ON DELETE CASCADE,
+  memory_id UUID REFERENCES memories(id) ON DELETE CASCADE,
+  type TEXT NOT NULL CHECK (type IN ('photo', 'video', 'audio', 'music_embed')),
+  url TEXT NOT NULL,
+  thumbnail_url TEXT,
+  metadata JSONB, -- Store additional info like duration, dimensions, etc.
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()) NOT NULL
 );
 
 -- Virtual stamps/tokens
@@ -119,6 +119,9 @@ CREATE POLICY "Users can view partner profile" ON profiles
     OR id IN (SELECT id FROM profiles WHERE partner_id = auth.uid())
   );
 
+CREATE POLICY "Users can create their own profile" ON profiles
+  FOR INSERT WITH CHECK (auth.uid() = id);
+
 CREATE POLICY "Users can update own profile" ON profiles
   FOR UPDATE USING (auth.uid() = id);
 
@@ -140,6 +143,13 @@ CREATE POLICY "Users can view related media" ON media
     OR memory_id IN (SELECT id FROM memories WHERE user_id = auth.uid() OR partner_id = auth.uid())
   );
 
+CREATE POLICY "Users can create media for their content" ON media
+  FOR INSERT WITH CHECK (
+    letter_id IN (SELECT id FROM letters WHERE sender_id = auth.uid())
+    OR journal_entry_id IN (SELECT id FROM journal_entries WHERE author_id = auth.uid())
+    OR memory_id IN (SELECT id FROM memories WHERE user_id = auth.uid())
+  );
+
 -- Journal entries: Both partners can view and create
 CREATE POLICY "Partners can view journal entries" ON journal_entries
   FOR SELECT USING (auth.uid() = author_id OR auth.uid() = partner_id);
@@ -158,9 +168,29 @@ CREATE POLICY "Partners can create memories" ON memories
 CREATE POLICY "Partners can view stamps" ON stamps
   FOR SELECT USING (auth.uid() = user_id OR auth.uid() = partner_id);
 
+CREATE POLICY "Partners can create stamps" ON stamps
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
 -- Countdowns: Partners can view each other's countdowns
 CREATE POLICY "Partners can view countdowns" ON countdowns
   FOR SELECT USING (auth.uid() = user_id OR auth.uid() = partner_id);
+
+CREATE POLICY "Partners can create countdowns" ON countdowns
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- Function to create user profile after signup
+CREATE OR REPLACE FUNCTION create_user_profile(
+  user_id UUID,
+  user_email TEXT,
+  user_display_name TEXT
+)
+RETURNS void AS $$
+BEGIN
+  INSERT INTO profiles (id, email, display_name)
+  VALUES (user_id, user_email, user_display_name)
+  ON CONFLICT (id) DO NOTHING;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Heart, Mail, BookOpen, Images, Clock, Settings } from 'lucide-react'
+import { Heart, Mail, BookOpen, ImageIcon, Clock, Settings } from 'lucide-react'
 import { useUser } from '@/app/providers'
 
 export function Navigation() {
@@ -15,7 +15,7 @@ export function Navigation() {
     { href: '/dashboard', label: 'Dashboard', icon: Heart },
     { href: '/letters', label: 'Letters', icon: Mail },
     { href: '/journal', label: 'Journal', icon: BookOpen },
-    { href: '/memories', label: 'Memories', icon: Images },
+    { href: '/memories', label: 'Memories', icon: ImageIcon },
     { href: '/countdowns', label: 'Countdowns', icon: Clock },
     { href: '/settings', label: 'Settings', icon: Settings },
   ]
