@@ -7,7 +7,7 @@ import { Navigation } from '@/components/Navigation'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Letters - For Long-Distance Love',
+  title: 'Dear Distance - For Long-Distance Love',
   description: 'A personal, intimate letter-sharing website for long-distance partners',
 }
 

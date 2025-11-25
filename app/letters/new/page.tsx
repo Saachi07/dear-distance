@@ -4,9 +4,10 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useUser } from '@/app/providers'
 import { createSupabaseClient } from '@/lib/supabase/client'
-import { encrypt, hashPassword } from '@/lib/encryption'
+import { encrypt, hashPassword, hashPassword as hashPuzzleAnswer } from '@/lib/encryption'
 import { LetterEditor } from '@/components/LetterEditor'
-import { Save, Lock, Calendar, Eye, EyeOff } from 'lucide-react'
+import { createActivity } from '@/lib/notifications'
+import { Save, Lock, Calendar, EyeOff, ArrowLeft } from 'lucide-react'
 
 export default function NewLetterPage() {
   const { user } = useUser()
@@ -21,6 +22,12 @@ export default function NewLetterPage() {
   const [scheduledDate, setScheduledDate] = useState('')
   const [loading, setLoading] = useState(false)
   const [media, setMedia] = useState<Array<{ type: string; url: string }>>([])
+  const [letterType, setLetterType] = useState<'regular' | 'open_when'>('regular')
+  const [openWhenCondition, setOpenWhenCondition] = useState('')
+  const [hasPuzzle, setHasPuzzle] = useState(false)
+  const [puzzleType, setPuzzleType] = useState<'riddle' | 'math' | 'word'>('riddle')
+  const [puzzleQuestion, setPuzzleQuestion] = useState('')
+  const [puzzleAnswer, setPuzzleAnswer] = useState('')
 
   const handleSave = async () => {
     if (!user || !title || !content) {
@@ -49,7 +56,7 @@ export default function NewLetterPage() {
       const encryptedContent = encrypt(content)
 
       // Prepare letter data
-      const letterData: any = {
+      const letterData = {
         sender_id: user.id,
         recipient_id: recipientId,
         title,
@@ -57,7 +64,12 @@ export default function NewLetterPage() {
         visibility,
         password_hash: hasPassword && password ? hashPassword(password) : null,
         scheduled_reveal_at: scheduledDate ? new Date(scheduledDate).toISOString() : null,
-        is_unlocked: !scheduledDate,
+        is_unlocked: !scheduledDate && !hasPuzzle,
+        letter_type: letterType,
+        open_when_condition: letterType === 'open_when' ? openWhenCondition : null,
+        puzzle_type: hasPuzzle ? puzzleType : null,
+        puzzle_question: hasPuzzle ? puzzleQuestion : null,
+        puzzle_answer_hash: hasPuzzle && puzzleAnswer ? hashPuzzleAnswer(puzzleAnswer) : null,
       }
 
       const { data: letter, error: letterError } = await supabase
@@ -79,10 +91,19 @@ export default function NewLetterPage() {
         await supabase.from('media').insert(mediaData)
       }
 
+      // Create activity
+      if (recipientId) {
+        await createActivity(user.id, recipientId, 'letter_sent', {
+          letter_id: letter.id,
+          title: letter.title,
+        })
+      }
+
       router.push(`/letters/${letter.id}`)
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error saving letter:', error)
-      alert(error.message || 'Failed to save letter')
+      const message = error instanceof Error ? error.message : 'Failed to save letter'
+      alert(message)
     } finally {
       setLoading(false)
     }
@@ -91,10 +112,60 @@ export default function NewLetterPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-soft-pink via-white to-dusty-blue py-8 px-4 pb-24 md:pb-8">
       <div className="max-w-4xl mx-auto">
+        <button
+          onClick={() => router.back()}
+          className="mb-4 flex items-center gap-2 text-vintage-ink/70 hover:text-vintage-ink transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          Back
+        </button>
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl p-8">
           <h1 className="text-3xl font-handwriting text-vintage-ink mb-8">Write a Letter</h1>
 
           <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-vintage-ink mb-2">
+                Letter Type
+              </label>
+              <div className="flex gap-4 mb-4">
+                <button
+                  onClick={() => setLetterType('regular')}
+                  className={`flex-1 px-4 py-3 rounded-lg border-2 transition-all ${
+                    letterType === 'regular'
+                      ? 'border-rose-gold bg-rose-gold/10'
+                      : 'border-vintage-ink/20'
+                  }`}
+                >
+                  Regular Letter
+                </button>
+                <button
+                  onClick={() => setLetterType('open_when')}
+                  className={`flex-1 px-4 py-3 rounded-lg border-2 transition-all ${
+                    letterType === 'open_when'
+                      ? 'border-rose-gold bg-rose-gold/10'
+                      : 'border-vintage-ink/20'
+                  }`}
+                >
+                  Open When...
+                </button>
+              </div>
+            </div>
+
+            {letterType === 'open_when' && (
+              <div>
+                <label className="block text-sm font-medium text-vintage-ink mb-2">
+                  Open When...
+                </label>
+                <input
+                  type="text"
+                  value={openWhenCondition}
+                  onChange={(e) => setOpenWhenCondition(e.target.value)}
+                  className="w-full px-4 py-3 border border-vintage-ink/20 rounded-lg focus:ring-2 focus:ring-rose-gold focus:border-transparent outline-none"
+                  placeholder="e.g., sad, missing me, want to hug me"
+                />
+              </div>
+            )}
+
             <div>
               <label className="block text-sm font-medium text-vintage-ink mb-2">
                 Title
@@ -104,7 +175,7 @@ export default function NewLetterPage() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 className="w-full px-4 py-3 border border-vintage-ink/20 rounded-lg focus:ring-2 focus:ring-rose-gold focus:border-transparent outline-none"
-                placeholder="My letter to you..."
+                placeholder={letterType === 'open_when' ? `Open when ${openWhenCondition || '...'}` : "My letter to you..."}
               />
             </div>
 
@@ -183,6 +254,60 @@ export default function NewLetterPage() {
                   />
                 )}
               </div>
+            </div>
+
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-vintage-ink mb-2">
+                <input
+                  type="checkbox"
+                  checked={hasPuzzle}
+                  onChange={(e) => setHasPuzzle(e.target.checked)}
+                  className="rounded"
+                />
+                Add Puzzle/Riddle Protection
+              </label>
+              {hasPuzzle && (
+                <div className="mt-4 space-y-4 p-4 bg-rose-gold/5 rounded-lg border border-rose-gold/20">
+                  <div>
+                    <label className="block text-sm font-medium text-vintage-ink mb-2">
+                      Puzzle Type
+                    </label>
+                    <select
+                      value={puzzleType}
+                      onChange={(e) => setPuzzleType(e.target.value as 'riddle' | 'math' | 'word')}
+                      className="w-full px-4 py-2 border border-vintage-ink/20 rounded-lg focus:ring-2 focus:ring-rose-gold focus:border-transparent outline-none"
+                    >
+                      <option value="riddle">Riddle</option>
+                      <option value="math">Math Problem</option>
+                      <option value="word">Word Puzzle</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-vintage-ink mb-2">
+                      Question
+                    </label>
+                    <input
+                      type="text"
+                      value={puzzleQuestion}
+                      onChange={(e) => setPuzzleQuestion(e.target.value)}
+                      className="w-full px-4 py-3 border border-vintage-ink/20 rounded-lg focus:ring-2 focus:ring-rose-gold focus:border-transparent outline-none"
+                      placeholder="Enter your puzzle question..."
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-vintage-ink mb-2">
+                      Answer
+                    </label>
+                    <input
+                      type="text"
+                      value={puzzleAnswer}
+                      onChange={(e) => setPuzzleAnswer(e.target.value)}
+                      className="w-full px-4 py-3 border border-vintage-ink/20 rounded-lg focus:ring-2 focus:ring-rose-gold focus:border-transparent outline-none"
+                      placeholder="The correct answer..."
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             <div>

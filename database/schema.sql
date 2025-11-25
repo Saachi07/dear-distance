@@ -1,3 +1,4 @@
+-- Dear Distance core schema
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
@@ -24,6 +25,11 @@ CREATE TABLE IF NOT EXISTS letters (
   scheduled_reveal_at TIMESTAMP WITH TIME ZONE,
   is_unlocked BOOLEAN DEFAULT false,
   opened_at TIMESTAMP WITH TIME ZONE,
+  letter_type TEXT DEFAULT 'regular' CHECK (letter_type IN ('regular', 'open_when')),
+  open_when_condition TEXT, -- e.g., "sad", "missing me", "want to hug me"
+  puzzle_type TEXT CHECK (puzzle_type IN ('riddle', 'math', 'word')), -- puzzle type
+  puzzle_question TEXT,
+  puzzle_answer_hash TEXT, -- Hashed answer
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()) NOT NULL
 );
@@ -87,6 +93,31 @@ CREATE TABLE IF NOT EXISTS countdowns (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()) NOT NULL
 );
 
+-- Time capsules
+CREATE TABLE IF NOT EXISTS time_capsules (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  partner_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  content_encrypted TEXT NOT NULL,
+  open_date DATE NOT NULL,
+  is_opened BOOLEAN DEFAULT false,
+  opened_at TIMESTAMP WITH TIME ZONE,
+  media_ids UUID[],
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()) NOT NULL
+);
+
+-- Activities (notification feed)
+CREATE TABLE IF NOT EXISTS activities (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  partner_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  activity_type TEXT NOT NULL CHECK (activity_type IN ('letter_sent', 'letter_opened', 'memory_added', 'journal_entry', 'time_capsule_created')),
+  activity_data JSONB,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()) NOT NULL
+);
+
 -- Indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_letters_sender ON letters(sender_id);
 CREATE INDEX IF NOT EXISTS idx_letters_recipient ON letters(recipient_id);
@@ -99,6 +130,11 @@ CREATE INDEX IF NOT EXISTS idx_journal_author ON journal_entries(author_id);
 CREATE INDEX IF NOT EXISTS idx_journal_partner ON journal_entries(partner_id);
 CREATE INDEX IF NOT EXISTS idx_memories_user ON memories(user_id);
 CREATE INDEX IF NOT EXISTS idx_memories_partner ON memories(partner_id);
+CREATE INDEX IF NOT EXISTS idx_time_capsules_user ON time_capsules(user_id);
+CREATE INDEX IF NOT EXISTS idx_time_capsules_partner ON time_capsules(partner_id);
+CREATE INDEX IF NOT EXISTS idx_time_capsules_open_date ON time_capsules(open_date);
+CREATE INDEX IF NOT EXISTS idx_activities_user ON activities(user_id);
+CREATE INDEX IF NOT EXISTS idx_activities_partner ON activities(partner_id);
 
 -- Row Level Security (RLS) Policies
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
@@ -108,6 +144,8 @@ ALTER TABLE journal_entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE memories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE stamps ENABLE ROW LEVEL SECURITY;
 ALTER TABLE countdowns ENABLE ROW LEVEL SECURITY;
+ALTER TABLE time_capsules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE activities ENABLE ROW LEVEL SECURITY;
 
 -- Profiles: Users can read their own profile and their partner's
 CREATE POLICY "Users can view own profile" ON profiles
@@ -178,6 +216,23 @@ CREATE POLICY "Partners can view countdowns" ON countdowns
 CREATE POLICY "Partners can create countdowns" ON countdowns
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+-- Time capsules
+CREATE POLICY "Users can view own time capsules" ON time_capsules
+  FOR SELECT USING (auth.uid() = user_id OR auth.uid() = partner_id);
+
+CREATE POLICY "Users can create time capsules" ON time_capsules
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own time capsules" ON time_capsules
+  FOR UPDATE USING (auth.uid() = user_id);
+
+-- Activities
+CREATE POLICY "Partners can view activities" ON activities
+  FOR SELECT USING (auth.uid() = user_id OR auth.uid() = partner_id);
+
+CREATE POLICY "Users can create activities" ON activities
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
 -- Function to create user profile after signup
 CREATE OR REPLACE FUNCTION create_user_profile(
   user_id UUID,
@@ -212,4 +267,7 @@ CREATE TRIGGER update_journal_entries_updated_at BEFORE UPDATE ON journal_entrie
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_memories_updated_at BEFORE UPDATE ON memories
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_time_capsules_updated_at BEFORE UPDATE ON time_capsules
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

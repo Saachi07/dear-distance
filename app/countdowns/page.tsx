@@ -1,10 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useUser } from '@/app/providers'
 import { createSupabaseClient } from '@/lib/supabase/client'
+import { fetchPartnerId } from '@/lib/partner'
 import { CountdownTimer } from '@/components/CountdownTimer'
-import { Clock, Plus } from 'lucide-react'
+import { Clock, Plus, ArrowLeft } from 'lucide-react'
 
 interface Countdown {
   id: string
@@ -15,6 +17,7 @@ interface Countdown {
 
 export default function CountdownsPage() {
   const { user } = useUser()
+  const router = useRouter()
   const supabase = createSupabaseClient()
   const [countdowns, setCountdowns] = useState<Countdown[]>([])
   const [loading, setLoading] = useState(true)
@@ -25,23 +28,12 @@ export default function CountdownsPage() {
   })
   const [submitting, setSubmitting] = useState(false)
 
-  useEffect(() => {
-    if (user) {
-      loadCountdowns()
-    }
-  }, [user])
-
-  const loadCountdowns = async () => {
+  const loadCountdowns = useCallback(async () => {
     if (!user) return
 
-    // Get partner ID
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('partner_id')
-      .eq('id', user.id)
-      .single()
+    const partnerId = await fetchPartnerId(supabase, user.id)
 
-    if (!profile?.partner_id) {
+    if (!partnerId) {
       setLoading(false)
       return
     }
@@ -59,7 +51,13 @@ export default function CountdownsPage() {
       setCountdowns(data || [])
     }
     setLoading(false)
-  }
+  }, [supabase, user])
+
+  useEffect(() => {
+    if (user) {
+      loadCountdowns()
+    }
+  }, [user, loadCountdowns])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -68,14 +66,9 @@ export default function CountdownsPage() {
     setSubmitting(true)
 
     try {
-      // Get partner ID
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('partner_id')
-        .eq('id', user.id)
-        .single()
+      const partnerId = await fetchPartnerId(supabase, user.id)
 
-      if (!profile?.partner_id) {
+      if (!partnerId) {
         alert('Please connect with your partner in settings first')
         return
       }
@@ -84,7 +77,7 @@ export default function CountdownsPage() {
         .from('countdowns')
         .insert({
           user_id: user.id,
-          partner_id: profile.partner_id,
+          partner_id: partnerId,
           title: formData.title,
           target_date: new Date(formData.target_date).toISOString(),
         })
@@ -94,9 +87,10 @@ export default function CountdownsPage() {
       setFormData({ title: '', target_date: '' })
       setShowForm(false)
       loadCountdowns()
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error creating countdown:', error)
-      alert(error.message || 'Failed to create countdown')
+      const message = error instanceof Error ? error.message : 'Failed to create countdown'
+      alert(message)
     } finally {
       setSubmitting(false)
     }
@@ -115,6 +109,13 @@ export default function CountdownsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-soft-pink via-white to-dusty-blue py-8 px-4 pb-24 md:pb-8">
       <div className="container mx-auto max-w-4xl">
+        <button
+          onClick={() => router.back()}
+          className="mb-4 flex items-center gap-2 text-vintage-ink/70 hover:text-vintage-ink transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          Back
+        </button>
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-4xl font-handwriting text-vintage-ink mb-2">Countdowns</h1>

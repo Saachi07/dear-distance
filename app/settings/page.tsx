@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useUser } from '../providers'
 import { createSupabaseClient } from '@/lib/supabase/client'
-import { Settings as SettingsIcon, User, Mail, Heart, Palette, Save } from 'lucide-react'
+import { Settings as SettingsIcon, User, Mail, Heart, Palette, Save, ArrowLeft } from 'lucide-react'
 
 interface Profile {
   id: string
@@ -15,10 +16,12 @@ interface Profile {
 
 export default function SettingsPage() {
   const { user, setTheme, theme } = useUser()
+  const router = useRouter()
   const supabase = createSupabaseClient()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [displayName, setDisplayName] = useState('')
   const [partnerEmail, setPartnerEmail] = useState('')
+  const [currentPartnerEmail, setCurrentPartnerEmail] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -29,13 +32,7 @@ export default function SettingsPage() {
     { id: 'storybook', name: 'Storybook', color: '#fefefe' },
   ]
 
-  useEffect(() => {
-    if (user) {
-      loadProfile()
-    }
-  }, [user])
-
-  const loadProfile = async () => {
+  const loadProfile = useCallback(async () => {
     if (!user) return
 
     const { data, error } = await supabase
@@ -59,11 +56,21 @@ export default function SettingsPage() {
         
         if (partner) {
           setPartnerEmail(partner.email)
+          setCurrentPartnerEmail(partner.email)
         }
+      } else {
+        setPartnerEmail('')
+        setCurrentPartnerEmail('')
       }
     }
     setLoading(false)
-  }
+  }, [supabase, user])
+
+  useEffect(() => {
+    if (user) {
+      loadProfile()
+    }
+  }, [user, loadProfile])
 
   const handleSave = async () => {
     if (!user) return
@@ -73,27 +80,53 @@ export default function SettingsPage() {
     try {
       let partnerId = profile?.partner_id || null
 
-      // If partner email provided and different from current
-      if (partnerEmail && partnerEmail !== profile?.email) {
-        const { data: partner } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('email', partnerEmail)
-          .single()
+      const normalizedEmail = partnerEmail.trim().toLowerCase()
+      const currentNormalized = currentPartnerEmail.trim().toLowerCase()
+      const userEmailNormalized = (profile?.email || '').toLowerCase()
 
-        if (partner) {
-          partnerId = partner.id
-
-          // Also update partner's profile to link back
-          await supabase
-            .from('profiles')
-            .update({ partner_id: user.id })
-            .eq('id', partner.id)
-        } else {
-          alert('Partner email not found')
+      if (!normalizedEmail) {
+        // User cleared the field — unlink partner on both sides
+        if (partnerId) {
+          await supabase.from('profiles').update({ partner_id: null }).eq('id', partnerId)
+        }
+        partnerId = null
+        setCurrentPartnerEmail('')
+      } else if (normalizedEmail !== currentNormalized) {
+        if (normalizedEmail === userEmailNormalized) {
+          alert('You cannot link your own email as a partner.')
           setSaving(false)
           return
         }
+
+        const { data: partner, error: partnerLookupError } = await supabase
+          .from('profiles')
+          .select('id, partner_id')
+          .eq('email', normalizedEmail)
+          .single()
+
+        if (partnerLookupError || !partner) {
+          alert('Partner email not found.')
+          setSaving(false)
+          return
+        }
+
+        if (partner.partner_id && partner.partner_id !== user.id) {
+          alert('That partner is already linked to someone else.')
+          setSaving(false)
+          return
+        }
+
+        // unlink previous partner if exists
+        if (partnerId && partnerId !== partner.id) {
+          await supabase.from('profiles').update({ partner_id: null }).eq('id', partnerId)
+        }
+
+        partnerId = partner.id
+
+        await supabase
+          .from('profiles')
+          .update({ partner_id: user.id })
+          .eq('id', partner.id)
       }
 
       const { error } = await supabase
@@ -109,9 +142,10 @@ export default function SettingsPage() {
 
       alert('Settings saved!')
       loadProfile()
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error saving settings:', error)
-      alert(error.message || 'Failed to save settings')
+      const message = error instanceof Error ? error.message : 'Failed to save settings'
+      alert(message)
     } finally {
       setSaving(false)
     }
@@ -130,6 +164,13 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-soft-pink via-white to-dusty-blue py-8 px-4 pb-24 md:pb-8">
       <div className="container mx-auto max-w-2xl">
+        <button
+          onClick={() => router.back()}
+          className="mb-4 flex items-center gap-2 text-vintage-ink/70 hover:text-vintage-ink transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          Back
+        </button>
         <div className="mb-8">
           <h1 className="text-4xl font-handwriting text-vintage-ink mb-2">Settings</h1>
           <p className="text-vintage-ink/70">Manage your account and preferences</p>
@@ -176,7 +217,7 @@ export default function SettingsPage() {
               placeholder="partner@email.com"
             />
             <p className="mt-1 text-xs text-vintage-ink/60">
-              Enter your partner's email to connect accounts
+              Enter your partner&rsquo;s email to connect accounts
             </p>
           </div>
 

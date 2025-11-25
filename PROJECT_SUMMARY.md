@@ -108,7 +108,7 @@ letters/
 1. **Set up Supabase**:
    - Create project
    - Run schema.sql
-   - Create `letters-media` storage bucket
+   - Create `dear-distance-media` storage bucket
 
 2. **Configure Environment**:
    - Copy `env.example` to `.env.local`

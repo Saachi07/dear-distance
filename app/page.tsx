@@ -35,7 +35,7 @@ export default function Home() {
           </div>
           
           <h1 className="text-6xl font-handwriting mb-6 text-vintage-ink">
-            Letters
+            Dear Distance
           </h1>
           
           <p className="text-xl text-vintage-ink/80 mb-12 max-w-2xl mx-auto">

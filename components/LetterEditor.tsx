@@ -6,9 +6,9 @@ import Image from '@tiptap/extension-image'
 import TipTapLink from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import { 
-  Bold, Italic, Underline, Heading1, Heading2, 
-  List, ListOrdered, Quote, Link2,
-  Image as ImageIcon, Upload, Mic, Video, Music
+  Bold, Italic, Heading1, Heading2, 
+  List, ListOrdered, Quote,
+  Image as ImageIcon, Mic, Video, Music
 } from 'lucide-react'
 import { useState, useRef } from 'react'
 import { createSupabaseClient } from '@/lib/supabase/client'
@@ -21,8 +21,11 @@ interface LetterEditorProps {
 
 export function LetterEditor({ content, onChange, onMediaAdd }: LetterEditorProps) {
   const [isRecording, setIsRecording] = useState(false)
+  const [isRecordingVideo, setIsRecordingVideo] = useState(false)
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null)
+  const [videoStream, setVideoStream] = useState<MediaStream | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const videoPreviewRef = useRef<HTMLVideoElement>(null)
   const supabase = createSupabaseClient()
 
   const editor = useEditor({
@@ -59,15 +62,16 @@ export function LetterEditor({ content, onChange, onMediaAdd }: LetterEditorProp
       const fileName = `${Date.now()}.${fileExt}`
       const filePath = `${type}s/${fileName}`
 
-      const { data, error } = await supabase.storage
-        .from('letters-media')
+      const { error } = await supabase.storage
+        .from('dear-distance-media')
         .upload(filePath, file)
 
       if (error) throw error
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('letters-media')
+      const { data: publicUrlData } = supabase.storage
+        .from('dear-distance-media')
         .getPublicUrl(filePath)
+      const publicUrl = publicUrlData.publicUrl
 
       if (type === 'photo' && editor) {
         editor.chain().focus().setImage({ src: publicUrl }).run()
@@ -122,10 +126,50 @@ export function LetterEditor({ content, onChange, onMediaAdd }: LetterEditorProp
     }
   }
 
+  const startVideoRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+      setVideoStream(stream)
+      
+      if (videoPreviewRef.current) {
+        videoPreviewRef.current.srcObject = stream
+        videoPreviewRef.current.play()
+      }
+
+      const recorder = new MediaRecorder(stream, {
+        mimeType: 'video/webm;codecs=vp8,opus'
+      })
+      const chunks: BlobPart[] = []
+
+      recorder.ondataavailable = (e) => {
+        chunks.push(e.data)
+      }
+
+      recorder.onstop = async () => {
+        const blob = new Blob(chunks, { type: 'video/webm' })
+        const file = new File([blob], `video-${Date.now()}.webm`, { type: 'video/webm' })
+        await uploadVideo(file)
+        stream.getTracks().forEach(track => track.stop())
+        setVideoStream(null)
+        if (videoPreviewRef.current) {
+          videoPreviewRef.current.srcObject = null
+        }
+      }
+
+      recorder.start()
+      setMediaRecorder(recorder)
+      setIsRecordingVideo(true)
+    } catch (error) {
+      console.error('Error starting video recording:', error)
+      alert('Failed to start video recording')
+    }
+  }
+
   const stopRecording = () => {
     if (mediaRecorder) {
       mediaRecorder.stop()
       setIsRecording(false)
+      setIsRecordingVideo(false)
       setMediaRecorder(null)
     }
   }
@@ -135,15 +179,16 @@ export function LetterEditor({ content, onChange, onMediaAdd }: LetterEditorProp
       const fileName = `audio-${Date.now()}.webm`
       const filePath = `audio/${fileName}`
 
-      const { data, error } = await supabase.storage
-        .from('letters-media')
+      const { error } = await supabase.storage
+        .from('dear-distance-media')
         .upload(filePath, file)
 
       if (error) throw error
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('letters-media')
+      const { data: publicUrlData } = supabase.storage
+        .from('dear-distance-media')
         .getPublicUrl(filePath)
+      const publicUrl = publicUrlData.publicUrl
 
       if (editor) {
         editor.chain().focus().insertContent(`
@@ -157,6 +202,37 @@ export function LetterEditor({ content, onChange, onMediaAdd }: LetterEditorProp
     } catch (error) {
       console.error('Error uploading audio:', error)
       alert('Failed to upload audio')
+    }
+  }
+
+  const uploadVideo = async (file: File) => {
+    try {
+      const fileName = `video-${Date.now()}.webm`
+      const filePath = `videos/${fileName}`
+
+      const { error } = await supabase.storage
+        .from('dear-distance-media')
+        .upload(filePath, file)
+
+      if (error) throw error
+
+      const { data: publicUrlData } = supabase.storage
+        .from('dear-distance-media')
+        .getPublicUrl(filePath)
+      const publicUrl = publicUrlData.publicUrl
+
+      if (editor) {
+        editor.chain().focus().insertContent(`
+          <div class="video-player my-4">
+            <video controls src="${publicUrl}" class="w-full rounded-lg"></video>
+          </div>
+        `).run()
+      }
+
+      onMediaAdd?.({ type: 'video', url: publicUrl })
+    } catch (error) {
+      console.error('Error uploading video:', error)
+      alert('Failed to upload video')
     }
   }
 
@@ -256,9 +332,9 @@ export function LetterEditor({ content, onChange, onMediaAdd }: LetterEditorProp
           <Mic className="w-4 h-4" />
         </button>
         <button
-          onClick={handleImageUpload}
-          className="p-2 rounded hover:bg-rose-gold/10"
-          title="Upload Video"
+          onClick={isRecordingVideo ? stopRecording : startVideoRecording}
+          className={`p-2 rounded hover:bg-rose-gold/10 ${isRecordingVideo ? 'bg-red-100 animate-pulse' : ''}`}
+          title={isRecordingVideo ? "Stop Recording" : "Record Video"}
         >
           <Video className="w-4 h-4" />
         </button>
@@ -270,6 +346,24 @@ export function LetterEditor({ content, onChange, onMediaAdd }: LetterEditorProp
           <Music className="w-4 h-4" />
         </button>
       </div>
+      {isRecordingVideo && videoStream && (
+        <div className="p-4 bg-red-50 border-b border-red-200">
+          <video
+            ref={videoPreviewRef}
+            autoPlay
+            muted
+            className="w-full max-w-md mx-auto rounded-lg"
+          />
+          <div className="text-center mt-2">
+            <button
+              onClick={stopRecording}
+              className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+            >
+              Stop Recording
+            </button>
+          </div>
+        </div>
+      )}
       <EditorContent editor={editor} />
       <input
         ref={fileInputRef}
