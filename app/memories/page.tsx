@@ -55,8 +55,7 @@ export default function MemoriesPage() {
         media(*)
       `)
       .or(`user_id.eq.${user.id},partner_id.eq.${user.id}`)
-      .order('memory_date', { ascending: false, nullsLast: true })
-
+      .order('memory_date', { ascending: false, nullsFirst: false })
     if (error) {
       console.error('Error loading memories:', error)
     } else {
