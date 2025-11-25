@@ -1,4 +1,4 @@
-# Letters 
+# Dear Distance 
 
 A personal, intimate letter-sharing website for long-distance partners. Create beautiful letters with photos, voice recordings, videos, and music. Build shared memories, journal together, and count down to special moments—no matter the distance.
 
@@ -95,7 +95,7 @@ yarn install
 
 4. Set up Storage:
    - Go to Storage in your Supabase dashboard
-   - Create a new bucket named `letters-media`
+   - Create a new bucket named `dear-distance-media`
    - Set it to public (for now, or configure RLS policies)
 
 ### 3. Configure Environment Variables

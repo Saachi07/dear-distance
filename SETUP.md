@@ -7,7 +7,7 @@ After creating your Supabase project and running the database schema:
 1. **Create Storage Bucket**:
    - Go to Storage in your Supabase dashboard
    - Click "Create a new bucket"
-   - Name: `letters-media`
+   - Name: `dear-distance-media`
    - Set as **Public** (for easier access, or configure RLS policies for private access)
 
 2. **Configure Storage Policies** (if bucket is not public):
@@ -18,12 +18,12 @@ After creating your Supabase project and running the database schema:
    -- Allow authenticated users to upload files
    CREATE POLICY "Users can upload media" ON storage.objects
      FOR INSERT TO authenticated
-     WITH CHECK (bucket_id = 'letters-media');
+    WITH CHECK (bucket_id = 'dear-distance-media');
 
    -- Allow users to view their own media and partner's media
    CREATE POLICY "Users can view related media" ON storage.objects
      FOR SELECT TO authenticated
-     USING (bucket_id = 'letters-media');
+    USING (bucket_id = 'dear-distance-media');
    ```
 
 ## Encryption Key Generation
@@ -78,7 +78,7 @@ Add this to your `.env.local` file as `ENCRYPTION_KEY`.
 ## Troubleshooting
 
 ### "Failed to upload media"
-- Check that the `letters-media` bucket exists in Supabase Storage
+- Check that the `dear-distance-media` bucket exists in Supabase Storage
 - Verify the bucket is public or RLS policies are set correctly
 - Check browser console for specific error messages
 

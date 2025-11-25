@@ -53,7 +53,7 @@ yarn install
 
 1. In Supabase dashboard, go to **Storage**
 2. Click "Create a new bucket"
-3. Name it: `letters-media`
+3. Name it: `dear-distance-media`
 4. Check **"Public bucket"** to make it public
 5. Click "Create bucket"
 
@@ -135,7 +135,7 @@ The application will start at **http://localhost:3000**
 - Restart the dev server after changing `.env.local`
 
 ### "Failed to upload media"
-- Verify the `letters-media` bucket exists in Supabase Storage
+- Verify the `dear-distance-media` bucket exists in Supabase Storage
 - Check that the bucket is set to "Public"
 - Check browser console for specific error messages
 

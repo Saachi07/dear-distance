@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useUser } from '../providers'
 import { createSupabaseClient } from '@/lib/supabase/client'
 import { 
   Heart, Mail, BookOpen, ImageIcon, Clock, Settings, 
-  Plus, LogOut, User, ArrowRight 
+  LogOut, ArrowRight, Activity, Sparkles, Bell
 } from 'lucide-react'
 
 interface Profile {
@@ -26,18 +26,7 @@ export default function DashboardPage() {
   const [journalCount, setJournalCount] = useState(0)
   const [memoryCount, setMemoryCount] = useState(0)
 
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push('/auth/login')
-      return
-    }
-
-    if (user) {
-      loadData()
-    }
-  }, [user, loading, router])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!user) return
 
     // Load profile
@@ -70,7 +59,18 @@ export default function DashboardPage() {
     setLetterCount(lettersRes.count || 0)
     setJournalCount(journalRes.count || 0)
     setMemoryCount(memoriesRes.count || 0)
-  }
+  }, [supabase, user])
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/auth/login')
+      return
+    }
+
+    if (user) {
+      loadData()
+    }
+  }, [user, loading, router, loadData])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -93,9 +93,15 @@ export default function DashboardPage() {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-2">
             <Heart className="w-8 h-8 text-rose-gold fill-rose-gold" />
-            <span className="text-2xl font-handwriting text-vintage-ink">Letters</span>
+            <span className="text-2xl font-handwriting text-vintage-ink">Dear Distance</span>
           </Link>
           <div className="flex items-center gap-4">
+            <Link
+              href="/notifications"
+              className="p-2 hover:bg-rose-gold/10 rounded-lg transition-colors"
+            >
+              <Bell className="w-5 h-5 text-vintage-ink" />
+            </Link>
             <Link
               href="/settings"
               className="p-2 hover:bg-rose-gold/10 rounded-lg transition-colors"
@@ -115,22 +121,16 @@ export default function DashboardPage() {
       <div className="container mx-auto px-4 py-8 pb-24 md:pb-8">
         <div className="mb-8">
           <h1 className="text-4xl font-handwriting text-vintage-ink mb-2">
-            Welcome back, {profile?.display_name || 'there'} 💕
+            Welcome back {profile?.display_name || 'there'} 
           </h1>
           <p className="text-vintage-ink/70">
-            {profile?.partner_id ? 'Connected with your partner' : 'Connect with your partner in settings'}
+            {profile?.partner_id
+              ? 'Connected with your partner • their updates land in Notifications'
+              : 'Connect with your partner in settings whenever you’re ready'}
           </p>
         </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          <Link
-            href="/letters/new"
-            className="bg-white/80 backdrop-blur-sm rounded-xl p-6 shadow-lg hover:shadow-xl transition-all border-2 border-dashed border-rose-gold/30 hover:border-rose-gold flex items-center justify-center flex-col gap-3 min-h-[200px]"
-          >
-            <Plus className="w-12 h-12 text-rose-gold" />
-            <span className="text-lg font-semibold text-vintage-ink">Write a Letter</span>
-          </Link>
-
           <Link
             href="/letters"
             className="bg-white/80 backdrop-blur-sm rounded-xl p-6 shadow-lg hover:shadow-xl transition-all group"
@@ -189,6 +189,36 @@ export default function DashboardPage() {
             <h3 className="text-xl font-semibold text-vintage-ink mb-2">Countdowns</h3>
             <p className="text-vintage-ink/70 mb-2">Next reunion</p>
             <p className="text-sm text-vintage-ink/60">Track special dates</p>
+          </Link>
+
+          <Link
+            href="/activities"
+            className="bg-white/80 backdrop-blur-sm rounded-xl p-6 shadow-lg hover:shadow-xl transition-all group"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div className="p-3 bg-rose-gold/10 rounded-lg">
+                <Sparkles className="w-6 h-6 text-rose-gold" />
+              </div>
+              <ArrowRight className="w-5 h-5 text-vintage-ink/40 group-hover:text-rose-gold group-hover:translate-x-1 transition-all" />
+            </div>
+            <h3 className="text-xl font-semibold text-vintage-ink mb-2">Activities Hub</h3>
+            <p className="text-vintage-ink/70 mb-2">Date ideas & prompts</p>
+            <p className="text-sm text-vintage-ink/60">Plan sweet surprises</p>
+          </Link>
+
+          <Link
+            href="/activity"
+            className="bg-white/80 backdrop-blur-sm rounded-xl p-6 shadow-lg hover:shadow-xl transition-all group"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div className="p-3 bg-rose-gold/10 rounded-lg">
+                <Activity className="w-6 h-6 text-rose-gold" />
+              </div>
+              <ArrowRight className="w-5 h-5 text-vintage-ink/40 group-hover:text-rose-gold group-hover:translate-x-1 transition-all" />
+            </div>
+            <h3 className="text-xl font-semibold text-vintage-ink mb-2">Activity Feed</h3>
+            <p className="text-vintage-ink/70 mb-2">See what&rsquo;s happening</p>
+            <p className="text-sm text-vintage-ink/60">Partner activities</p>
           </Link>
         </div>
       </div>

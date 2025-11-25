@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useMemo } from 'react'
 import { createSupabaseClient } from '@/lib/supabase/client'
 import { Session, User } from '@supabase/supabase-js'
 
@@ -27,10 +27,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
   const [theme, setTheme] = useState<string>('minimal')
+  const supabase = useMemo(() => createSupabaseClient(), [])
 
   useEffect(() => {
-    const supabase = createSupabaseClient()
-
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
@@ -47,22 +46,23 @@ export function Providers({ children }: { children: React.ReactNode }) {
       setLoading(false)
     })
 
-    // Load theme preference
-    if (session?.user) {
-      supabase
-        .from('profiles')
-        .select('theme_preference')
-        .eq('id', session.user.id)
-        .single()
-        .then(({ data }) => {
-          if (data?.theme_preference) {
-            setTheme(data.theme_preference)
-          }
-        })
-    }
-
     return () => subscription.unsubscribe()
-  }, [])
+  }, [supabase])
+
+  useEffect(() => {
+    if (!user?.id) return
+
+    supabase
+      .from('profiles')
+      .select('theme_preference')
+      .eq('id', user.id)
+      .single()
+      .then(({ data }) => {
+        if (data?.theme_preference) {
+          setTheme(data.theme_preference)
+        }
+      })
+  }, [supabase, user])
 
   useEffect(() => {
     // Apply theme class to html element

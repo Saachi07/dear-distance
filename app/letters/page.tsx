@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useUser } from '@/app/providers'
 import { createSupabaseClient } from '@/lib/supabase/client'
-import { Mail, Lock, Calendar, Plus, Heart, ArrowRight } from 'lucide-react'
+import { Mail, Lock, Calendar, Plus, Heart, ArrowRight, ArrowLeft } from 'lucide-react'
 
 interface Letter {
   id: string
@@ -26,13 +26,7 @@ export default function LettersPage() {
   const [letters, setLetters] = useState<Letter[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    if (user) {
-      loadLetters()
-    }
-  }, [user])
-
-  const loadLetters = async () => {
+  const loadLetters = useCallback(async () => {
     if (!user) return
 
     const { data, error } = await supabase
@@ -50,7 +44,13 @@ export default function LettersPage() {
       setLetters(data || [])
     }
     setLoading(false)
-  }
+  }, [supabase, user])
+
+  useEffect(() => {
+    if (user) {
+      loadLetters()
+    }
+  }, [user, loadLetters])
 
   if (loading) {
     return (
@@ -65,6 +65,13 @@ export default function LettersPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-soft-pink via-white to-dusty-blue py-8 px-4 pb-24 md:pb-8">
       <div className="container mx-auto max-w-4xl">
+        <button
+          onClick={() => router.back()}
+          className="mb-4 flex items-center gap-2 text-vintage-ink/70 hover:text-vintage-ink transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          Back
+        </button>
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-4xl font-handwriting text-vintage-ink">My Letters</h1>
           <Link

@@ -96,9 +96,10 @@ export default function SignupPage() {
         router.push('/dashboard')
         router.refresh()
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('Signup error:', err)
-      setError(err.message || 'Failed to sign up')
+      const message = err instanceof Error ? err.message : 'Failed to sign up'
+      setError(message)
     } finally {
       setLoading(false)
     }

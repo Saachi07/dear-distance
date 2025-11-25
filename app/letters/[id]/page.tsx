@@ -1,16 +1,20 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useUser } from '@/app/providers'
 import { createSupabaseClient } from '@/lib/supabase/client'
-import { decrypt, verifyPassword } from '@/lib/encryption'
+import { decrypt, verifyPassword, hashPassword } from '@/lib/encryption'
 import { motion, AnimatePresence } from 'framer-motion'
 import Confetti from 'react-confetti'
-import { Heart, Lock, Calendar, User, Volume2 } from 'lucide-react'
+import { Heart, Lock, Calendar, User, Volume2, ArrowLeft, HelpCircle } from 'lucide-react'
+import { EnvelopeAnimation } from '@/components/EnvelopeAnimation'
+import { createActivity } from '@/lib/notifications'
 
 interface Letter {
   id: string
+  sender_id: string
+  recipient_id: string | null
   title: string
   content_encrypted: string
   password_hash: string | null
@@ -18,13 +22,18 @@ interface Letter {
   is_unlocked: boolean
   opened_at: string | null
   created_at: string
+  letter_type: 'regular' | 'open_when' | null
+  open_when_condition: string | null
+  puzzle_type: 'riddle' | 'math' | 'word' | null
+  puzzle_question: string | null
+  puzzle_answer_hash: string | null
   sender: { display_name: string; email: string }
 }
 
 export default function LetterViewPage() {
   const params = useParams()
   const router = useRouter()
-  const { user } = useUser()
+  const { user, loading: userLoading } = useUser()
   const supabase = createSupabaseClient()
   const [letter, setLetter] = useState<Letter | null>(null)
   const [decryptedContent, setDecryptedContent] = useState<string>('')
@@ -34,16 +43,13 @@ export default function LetterViewPage() {
   const [showConfetti, setShowConfetti] = useState(false)
   const [isUnlocked, setIsUnlocked] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [puzzleAnswer, setPuzzleAnswer] = useState('')
+  const [puzzleError, setPuzzleError] = useState('')
+  const [showEnvelopeAnimation, setShowEnvelopeAnimation] = useState(false)
 
-  useEffect(() => {
-    if (params.id && user) {
-      loadLetter()
-    } else if (params.id && !user) {
-      router.push('/auth/login')
-    }
-  }, [params.id, user, router])
+  const loadLetter = useCallback(async () => {
+    if (!params.id || !user) return
 
-  const loadLetter = async () => {
     try {
       const { data, error } = await supabase
         .from('letters')
@@ -57,10 +63,20 @@ export default function LetterViewPage() {
       if (error) throw error
 
       if (data) {
+        // Check if user has permission to view this letter
+        const isSender = data.sender_id === user?.id
+        const isRecipient = data.recipient_id === user?.id
+        
+        if (!isSender && !isRecipient) {
+          router.push('/letters')
+          return
+        }
+
         setLetter(data)
 
         const isScheduledUnlock = data.scheduled_reveal_at && new Date(data.scheduled_reveal_at) <= new Date()
-        const shouldBeUnlocked = data.is_unlocked || isScheduledUnlock
+        // Senders can always view their own letters, even if not unlocked
+        const shouldBeUnlocked = data.is_unlocked || isScheduledUnlock || isSender
 
         // Check if scheduled reveal has passed
         if (isScheduledUnlock && !data.is_unlocked) {
@@ -73,15 +89,21 @@ export default function LetterViewPage() {
             .eq('id', data.id)
           setIsUnlocked(true)
         } else {
-          setIsUnlocked(data.is_unlocked || false)
+          setIsUnlocked(data.is_unlocked || isSender)
         }
         
-        // If already unlocked or scheduled unlock passed, decrypt content
+        // Show envelope animation for "open when" letters
+        if (data.letter_type === 'open_when' && !shouldBeUnlocked) {
+          setShowEnvelopeAnimation(true)
+        }
+        
+        // If already unlocked, scheduled unlock passed, or user is sender, decrypt content
         if (shouldBeUnlocked) {
           try {
             const content = decrypt(data.content_encrypted)
             setDecryptedContent(content)
             setShowEnvelope(false)
+            setShowEnvelopeAnimation(false)
           } catch (error) {
             console.error('Error decrypting:', error)
           }
@@ -93,7 +115,17 @@ export default function LetterViewPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [params.id, router, supabase, user])
+
+  useEffect(() => {
+    if (userLoading) return
+
+    if (params.id && user) {
+      loadLetter()
+    } else if (params.id && !user) {
+      router.push('/auth/login')
+    }
+  }, [params.id, user, userLoading, router, loadLetter])
 
   const unlockLetter = async () => {
     if (!letter) return
@@ -107,6 +139,14 @@ export default function LetterViewPage() {
           opened_at: new Date().toISOString(),
         })
         .eq('id', letter.id)
+      
+      // Create activity
+      if (letter.sender_id !== user?.id) {
+        await createActivity(user?.id || '', letter.sender_id, 'letter_opened', {
+          letter_id: letter.id,
+          title: letter.title,
+        })
+      }
     }
 
     setIsUnlocked(true)
@@ -121,6 +161,19 @@ export default function LetterViewPage() {
       openEnvelope()
     } else {
       setPasswordError('Incorrect password')
+    }
+  }
+
+  const handlePuzzleSubmit = () => {
+    if (!letter || !letter.puzzle_answer_hash) return
+
+    const answerHash = hashPassword(puzzleAnswer.toLowerCase().trim())
+    if (answerHash === letter.puzzle_answer_hash) {
+      setPuzzleError('')
+      unlockLetter()
+      openEnvelope()
+    } else {
+      setPuzzleError('Incorrect answer. Try again!')
     }
   }
 
@@ -160,7 +213,7 @@ export default function LetterViewPage() {
     speechSynthesis.speak(utterance)
   }
 
-  if (loading) {
+  if (loading || userLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-pulse text-rose-gold">
@@ -189,7 +242,56 @@ export default function LetterViewPage() {
       )}
 
       <div className="max-w-3xl mx-auto">
+        <button
+          onClick={() => router.back()}
+          className="mb-4 flex items-center gap-2 text-vintage-ink/70 hover:text-vintage-ink transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          Back
+        </button>
         <AnimatePresence>
+          {showEnvelopeAnimation && letter?.letter_type === 'open_when' && !isUnlocked && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              {letter.puzzle_type && letter.puzzle_question ? (
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl p-12 text-center mb-8">
+                  <HelpCircle className="w-16 h-16 mx-auto text-rose-gold mb-4" />
+                  <h2 className="text-2xl font-handwriting text-vintage-ink mb-4">
+                    Solve the Puzzle
+                  </h2>
+                  <p className="text-vintage-ink mb-6">{letter.puzzle_question}</p>
+                  <input
+                    type="text"
+                    value={puzzleAnswer}
+                    onChange={(e) => setPuzzleAnswer(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handlePuzzleSubmit()}
+                    className="w-full max-w-xs mx-auto px-4 py-3 border border-vintage-ink/20 rounded-lg focus:ring-2 focus:ring-rose-gold focus:border-transparent outline-none mb-2"
+                    placeholder="Your answer..."
+                  />
+                  {puzzleError && (
+                    <p className="text-red-500 text-sm mb-4">{puzzleError}</p>
+                  )}
+                  <button
+                    onClick={handlePuzzleSubmit}
+                    className="px-8 py-4 bg-rose-gold text-white rounded-lg font-semibold hover:bg-rose-gold/90 transition-all shadow-lg"
+                  >
+                    Submit Answer
+                  </button>
+                </div>
+              ) : null}
+              <EnvelopeAnimation
+                openWhenText={letter.open_when_condition || 'you need this'}
+                onOpen={() => {
+                  setShowEnvelopeAnimation(false)
+                  openEnvelope()
+                }}
+                isUnlocked={isUnlocked}
+              />
+            </motion.div>
+          )}
           {showEnvelope && !isUnlocked && (
             <motion.div
               initial={{ opacity: 1, scale: 1 }}
@@ -246,7 +348,7 @@ export default function LetterViewPage() {
           )}
         </AnimatePresence>
 
-        {(!showEnvelope || isUnlocked) && decryptedContent && (
+        {(!showEnvelope || isUnlocked) && decryptedContent && !showEnvelopeAnimation && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}

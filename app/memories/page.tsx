@@ -1,11 +1,14 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useUser } from '@/app/providers'
 import { createSupabaseClient } from '@/lib/supabase/client'
-import { ImageIcon, Plus, Heart, Calendar } from 'lucide-react'
+import { ImageIcon, Plus, Heart, Calendar, ArrowLeft, Upload, X } from 'lucide-react'
 import { format } from 'date-fns'
 import Image from 'next/image'
+import { useRouter } from 'next/navigation'
+import { createActivity } from '@/lib/notifications'
+import { fetchPartnerId } from '@/lib/partner'
 
 interface Memory {
   id: string
@@ -20,6 +23,7 @@ interface Memory {
 
 export default function MemoriesPage() {
   const { user } = useUser()
+  const router = useRouter()
   const supabase = createSupabaseClient()
   const [memories, setMemories] = useState<Memory[]>([])
   const [loading, setLoading] = useState(true)
@@ -32,24 +36,14 @@ export default function MemoriesPage() {
     tags: '',
   })
   const [submitting, setSubmitting] = useState(false)
+  const [uploadedImages, setUploadedImages] = useState<Array<{ url: string; file: File }>>([])
 
-  useEffect(() => {
-    if (user) {
-      loadMemories()
-    }
-  }, [user])
-
-  const loadMemories = async () => {
+  const loadMemories = useCallback(async () => {
     if (!user) return
 
-    // Get partner ID
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('partner_id')
-      .eq('id', user.id)
-      .single()
+    const partnerId = await fetchPartnerId(supabase, user.id)
 
-    if (!profile?.partner_id) {
+    if (!partnerId) {
       setLoading(false)
       return
     }
@@ -69,6 +63,46 @@ export default function MemoriesPage() {
       setMemories(data || [])
     }
     setLoading(false)
+  }, [supabase, user])
+
+  useEffect(() => {
+    if (user) {
+      loadMemories()
+    }
+  }, [user, loadMemories])
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files) return
+
+    for (const file of Array.from(files)) {
+      if (!file.type.startsWith('image/')) continue
+
+      try {
+        const fileExt = file.name.split('.').pop()
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
+        const filePath = `memories/${fileName}`
+
+        const { error: uploadError } = await supabase.storage
+          .from('dear-distance-media')
+          .upload(filePath, file)
+
+        if (uploadError) throw uploadError
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('dear-distance-media')
+          .getPublicUrl(filePath)
+
+        setUploadedImages(prev => [...prev, { url: publicUrl, file }])
+      } catch (error) {
+        console.error('Error uploading image:', error)
+        alert('Failed to upload image')
+      }
+    }
+  }
+
+  const removeImage = (index: number) => {
+    setUploadedImages(prev => prev.filter((_, i) => i !== index))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -78,14 +112,9 @@ export default function MemoriesPage() {
     setSubmitting(true)
 
     try {
-      // Get partner ID
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('partner_id')
-        .eq('id', user.id)
-        .single()
+      const partnerId = await fetchPartnerId(supabase, user.id)
 
-      if (!profile?.partner_id) {
+      if (!partnerId) {
         alert('Please connect with your partner in settings first')
         return
       }
@@ -96,7 +125,7 @@ export default function MemoriesPage() {
         .from('memories')
         .insert({
           user_id: user.id,
-          partner_id: profile.partner_id,
+          partner_id: partnerId,
           title: formData.title || null,
           description: formData.description || null,
           quote: formData.quote || null,
@@ -108,12 +137,31 @@ export default function MemoriesPage() {
 
       if (error) throw error
 
+      // Upload images
+      if (uploadedImages.length > 0 && memory) {
+        const mediaData = uploadedImages.map(img => ({
+          memory_id: memory.id,
+          type: 'photo' as const,
+          url: img.url,
+        }))
+
+        await supabase.from('media').insert(mediaData)
+      }
+
+      // Create activity
+      await createActivity(user.id, partnerId, 'memory_added', {
+        memory_id: memory.id,
+        title: memory.title,
+      })
+
       setFormData({ title: '', description: '', quote: '', memory_date: '', tags: '' })
+      setUploadedImages([])
       setShowForm(false)
       loadMemories()
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error creating memory:', error)
-      alert(error.message || 'Failed to create memory')
+      const message = error instanceof Error ? error.message : 'Failed to create memory'
+      alert(message)
     } finally {
       setSubmitting(false)
     }
@@ -132,6 +180,13 @@ export default function MemoriesPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-soft-pink via-white to-dusty-blue py-8 px-4 pb-24 md:pb-8">
       <div className="container mx-auto max-w-6xl">
+        <button
+          onClick={() => router.back()}
+          className="mb-4 flex items-center gap-2 text-vintage-ink/70 hover:text-vintage-ink transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          Back
+        </button>
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-4xl font-handwriting text-vintage-ink mb-2">Memory Gallery</h1>
@@ -177,6 +232,39 @@ export default function MemoriesPage() {
                   className="w-full px-4 py-2 border border-vintage-ink/20 rounded-lg focus:ring-2 focus:ring-rose-gold focus:border-transparent outline-none"
                   placeholder="A memorable quote..."
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-vintage-ink mb-2">Images</label>
+                <div className="flex flex-wrap gap-4 mb-4">
+                  {uploadedImages.map((img, idx) => (
+                    <div key={idx} className="relative">
+                      <Image
+                        src={img.url}
+                        alt={`Upload ${idx + 1}`}
+                        width={96}
+                        height={96}
+                        className="w-24 h-24 object-cover rounded-lg"
+                      />
+                      <button
+                        onClick={() => removeImage(idx)}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-rose-gold/10 text-rose-gold rounded-lg hover:bg-rose-gold/20 transition-colors">
+                  <Upload className="w-4 h-4" />
+                  Upload Images
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={handleImageUpload}
+                  />
+                </label>
               </div>
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
@@ -234,9 +322,11 @@ export default function MemoriesPage() {
               >
                 {memory.media && memory.media.length > 0 && (
                   <div className="mb-4 rounded-lg overflow-hidden">
-                    <img
+                    <Image
                       src={memory.media[0].url}
                       alt={memory.title || 'Memory'}
+                      width={800}
+                      height={400}
                       className="w-full h-48 object-cover"
                     />
                   </div>
@@ -252,7 +342,7 @@ export default function MemoriesPage() {
                   </div>
                 )}
                 {memory.quote && (
-                  <p className="text-rose-gold italic mb-2">"{memory.quote}"</p>
+                  <p className="text-rose-gold italic mb-2">&ldquo;{memory.quote}&rdquo;</p>
                 )}
                 {memory.description && (
                   <p className="text-vintage-ink/80 text-sm mb-3">{memory.description}</p>

@@ -1,9 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useUser } from '@/app/providers'
 import { createSupabaseClient } from '@/lib/supabase/client'
-import { BookOpen, Send, User } from 'lucide-react'
+import { fetchPartnerId } from '@/lib/partner'
+import { BookOpen, Send, User, ArrowLeft } from 'lucide-react'
 import { format } from 'date-fns'
 
 interface JournalEntry {
@@ -16,29 +18,19 @@ interface JournalEntry {
 
 export default function JournalPage() {
   const { user } = useUser()
+  const router = useRouter()
   const supabase = createSupabaseClient()
   const [entries, setEntries] = useState<JournalEntry[]>([])
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
 
-  useEffect(() => {
-    if (user) {
-      loadEntries()
-    }
-  }, [user])
-
-  const loadEntries = async () => {
+  const loadEntries = useCallback(async () => {
     if (!user) return
 
-    // Get partner ID
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('partner_id')
-      .eq('id', user.id)
-      .single()
+    const partnerId = await fetchPartnerId(supabase, user.id)
 
-    if (!profile?.partner_id) {
+    if (!partnerId) {
       setLoading(false)
       return
     }
@@ -50,7 +42,7 @@ export default function JournalPage() {
         author:profiles!journal_entries_author_id_fkey(display_name, email)
       `)
       .or(`author_id.eq.${user.id},partner_id.eq.${user.id}`)
-      .or(`author_id.eq.${profile.partner_id},partner_id.eq.${profile.partner_id}`)
+      .or(`author_id.eq.${partnerId},partner_id.eq.${partnerId}`)
       .order('created_at', { ascending: true })
 
     if (error) {
@@ -59,7 +51,13 @@ export default function JournalPage() {
       setEntries(data || [])
     }
     setLoading(false)
-  }
+  }, [supabase, user])
+
+  useEffect(() => {
+    if (user) {
+      loadEntries()
+    }
+  }, [user, loadEntries])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -68,14 +66,9 @@ export default function JournalPage() {
     setSubmitting(true)
 
     try {
-      // Get partner ID
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('partner_id')
-        .eq('id', user.id)
-        .single()
+      const partnerId = await fetchPartnerId(supabase, user.id)
 
-      if (!profile?.partner_id) {
+      if (!partnerId) {
         alert('Please connect with your partner in settings first')
         return
       }
@@ -84,7 +77,7 @@ export default function JournalPage() {
         .from('journal_entries')
         .insert({
           author_id: user.id,
-          partner_id: profile.partner_id,
+          partner_id: partnerId,
           content: content.trim(),
         })
 
@@ -92,9 +85,10 @@ export default function JournalPage() {
 
       setContent('')
       loadEntries()
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error submitting entry:', error)
-      alert(error.message || 'Failed to save entry')
+      const message = error instanceof Error ? error.message : 'Failed to save entry'
+      alert(message)
     } finally {
       setSubmitting(false)
     }
@@ -113,6 +107,13 @@ export default function JournalPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-soft-pink via-white to-dusty-blue py-8 px-4 pb-24 md:pb-8">
       <div className="container mx-auto max-w-4xl">
+        <button
+          onClick={() => router.back()}
+          className="mb-4 flex items-center gap-2 text-vintage-ink/70 hover:text-vintage-ink transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          Back
+        </button>
         <div className="mb-8">
           <h1 className="text-4xl font-handwriting text-vintage-ink mb-2">Shared Journal</h1>
           <p className="text-vintage-ink/70">Write back and forth with your partner</p>
