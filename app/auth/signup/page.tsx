@@ -79,20 +79,6 @@ export default function SignupPage() {
       }
 
       if (data.user) {
-        // Create profile using RPC to bypass RLS
-        const { error: profileError } = await supabase
-          .rpc('create_user_profile', {
-            user_id: data.user.id,
-            user_email: email,
-            user_display_name: displayName,
-          })
-
-        if (profileError) {
-          setError('Account created but profile setup failed. Please sign in and complete your profile.')
-          console.error('Profile creation error:', profileError)
-          return
-        }
-
         router.push('/dashboard')
         router.refresh()
       }

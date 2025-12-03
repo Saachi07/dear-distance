@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useUser } from '../providers'
 import { createSupabaseClient } from '@/lib/supabase/client'
-import { Settings as SettingsIcon, User, Mail, Heart, Palette, Save, ArrowLeft } from 'lucide-react'
+import { Settings as SettingsIcon, User, Mail, Heart, Palette, Save, ArrowLeft, Users } from 'lucide-react'
 
 interface Profile {
   id: string
@@ -22,6 +22,7 @@ export default function SettingsPage() {
   const [displayName, setDisplayName] = useState('')
   const [partnerEmail, setPartnerEmail] = useState('')
   const [currentPartnerEmail, setCurrentPartnerEmail] = useState('')
+  const [friendEmail, setFriendEmail] = useState('') // New state for friends
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -84,6 +85,7 @@ export default function SettingsPage() {
       const currentNormalized = currentPartnerEmail.trim().toLowerCase()
       const userEmailNormalized = (profile?.email || '').toLowerCase()
 
+      // 1. Handle Primary Partner Connection/Unlinking
       if (!normalizedEmail) {
         // User cleared the field — unlink partner on both sides
         if (partnerId) {
@@ -105,7 +107,7 @@ export default function SettingsPage() {
           .single()
 
         if (partnerLookupError || !partner) {
-          alert('Partner email not found.')
+          alert('Partner email not found. Ensure your partner has signed up.')
           setSaving(false)
           return
         }
@@ -129,6 +131,7 @@ export default function SettingsPage() {
           .eq('id', partner.id)
       }
 
+      // 2. Handle Display Name and Theme Save (Primary Save)
       const { error } = await supabase
         .from('profiles')
         .update({
@@ -139,6 +142,46 @@ export default function SettingsPage() {
         .eq('id', user.id)
 
       if (error) throw error
+      
+      // 3. Handle Optional Friend Connection (New Logic)
+      if (friendEmail.trim()) {
+        const normalizedFriendEmail = friendEmail.trim().toLowerCase()
+        setFriendEmail('') // Clear the input immediately after reading it
+
+        if (normalizedFriendEmail === userEmailNormalized || normalizedFriendEmail === normalizedEmail) {
+            alert('Cannot add your own email or your primary partner\'s email as a friend.')
+        } else {
+            const { data: friend, error: friendLookupError } = await supabase
+                .from('profiles')
+                .select('id')
+                .eq('email', normalizedFriendEmail)
+                .single()
+
+            if (friendLookupError || !friend) {
+                alert(`Friend email "${normalizedFriendEmail}" not found.`)
+            } else {
+                // Insert friend relationship (unidirectional for now)
+                const { error: friendInsertError } = await supabase
+                    .from('friend_relationships')
+                    .insert({
+                        user_id: user.id,
+                        friend_id: friend.id,
+                        relationship_type: 'friend',
+                    })
+
+                if (friendInsertError) {
+                    if (friendInsertError.code === '23505') { // Unique constraint violation (already friends)
+                        alert(`You are already friends with ${normalizedFriendEmail}.`)
+                    } else {
+                        throw friendInsertError
+                    }
+                } else {
+                    alert(`Friend ${normalizedFriendEmail} added!`)
+                }
+            }
+        }
+    }
+
 
       alert('Settings saved!')
       loadProfile()
@@ -207,7 +250,7 @@ export default function SettingsPage() {
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-vintage-ink mb-2">
               <Heart className="w-4 h-4" />
-              Partner Email
+              Primary Partner Email
             </label>
             <input
               type="email"
@@ -217,7 +260,25 @@ export default function SettingsPage() {
               placeholder="partner@email.com"
             />
             <p className="mt-1 text-xs text-vintage-ink/60">
-              Enter your partner&rsquo;s email to connect accounts
+              Your main partner for shared journal, memories, and letters
+            </p>
+          </div>
+
+          {/* New Section for Optional Friends (Added UI) */}
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium text-vintage-ink mb-2">
+              <Users className="w-4 h-4" />
+              Add Optional Friend
+            </label>
+            <input
+              type="email"
+              value={friendEmail}
+              onChange={(e) => setFriendEmail(e.target.value)}
+              className="w-full px-4 py-3 border border-vintage-ink/20 rounded-lg focus:ring-2 focus:ring-rose-gold focus:border-transparent outline-none"
+              placeholder="friend@email.com"
+            />
+            <p className="mt-1 text-xs text-vintage-ink/60">
+              Add long-distance friends for future friend-based features.
             </p>
           </div>
 

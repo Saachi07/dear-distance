@@ -93,20 +93,6 @@ CREATE TABLE IF NOT EXISTS countdowns (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()) NOT NULL
 );
 
--- Time capsules
-CREATE TABLE IF NOT EXISTS time_capsules (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-  partner_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
-  title TEXT NOT NULL,
-  content_encrypted TEXT NOT NULL,
-  open_date DATE NOT NULL,
-  is_opened BOOLEAN DEFAULT false,
-  opened_at TIMESTAMP WITH TIME ZONE,
-  media_ids UUID[],
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()) NOT NULL
-);
 
 -- Activities (notification feed)
 CREATE TABLE IF NOT EXISTS activities (
@@ -172,6 +158,24 @@ CREATE POLICY "Users can create letters" ON letters
 
 CREATE POLICY "Users can update own sent letters" ON letters
   FOR UPDATE USING (auth.uid() = sender_id);
+
+
+-- Function to create user profile after signup (FIX: Force lowercase email)
+CREATE OR REPLACE FUNCTION create_user_profile(
+  user_id UUID,
+  user_email TEXT,
+  user_display_name TEXT
+)
+
+
+RETURNS void AS $$
+BEGIN
+  INSERT INTO profiles (id, email, display_name)
+  VALUES (user_id, LOWER(user_email), user_display_name) 
+  ON CONFLICT (id) DO NOTHING;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 
 -- Media: Users can view media related to their letters/journal/memories
 CREATE POLICY "Users can view related media" ON media

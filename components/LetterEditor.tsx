@@ -245,8 +245,11 @@ export function LetterEditor({ content, onChange, onMediaAdd }: LetterEditorProp
 
     let embedHtml = ''
 
-    if (spotifyRegex.test(url)) {
-      embedHtml = `<iframe style="border-radius:12px" src="https://open.spotify.com/embed/track/${url.match(spotifyRegex)?.[1]}" width="100%" height="352" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>`
+    const spotifyMatch = url.match(spotifyRegex)
+    if (spotifyMatch) {
+      const trackId = spotifyMatch[1]
+      // Correct Spotify embed URL structure
+      embedHtml = `<iframe style="border-radius:12px" src="https://open.spotify.com/embed/track/${trackId}?utm_source=generator" width="100%" height="352" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>`
     } else if (soundcloudRegex.test(url)) {
       embedHtml = `<iframe width="100%" height="166" scrolling="no" frameborder="no" allow="autoplay" src="https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}&color=%23ff5500&auto_play=false&hide_related=false&show_comments=true&show_user=true&show_reposts=false&show_teaser=true"></iframe>`
     } else {
