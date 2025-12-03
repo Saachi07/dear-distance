@@ -46,6 +46,7 @@ export function LetterEditor({ content, onChange, onMediaAdd }: LetterEditorProp
       }),
     ],
     content,
+    immediatelyRender: false, 
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML())
     },

@@ -104,6 +104,36 @@ CREATE TABLE IF NOT EXISTS activities (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()) NOT NULL
 );
 
+-- Time capsules table (Added to support existing RLS policies)
+CREATE TABLE IF NOT EXISTS time_capsules (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  partner_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  title TEXT NOT NULL,
+  content_encrypted TEXT NOT NULL,
+  open_date TIMESTAMP WITH TIME ZONE NOT NULL,
+  is_opened BOOLEAN DEFAULT false,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()) NOT NULL
+);
+
+-- START NEW FEATURE: Friend Relationships
+CREATE TABLE IF NOT EXISTS friend_relationships (
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  friend_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  relationship_type TEXT DEFAULT 'friend' CHECK (relationship_type IN ('friend', 'blocked')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()) NOT NULL,
+  PRIMARY KEY (user_id, friend_id),
+  CONSTRAINT check_distinct_users CHECK (user_id != friend_id)
+);
+ALTER TABLE friend_relationships ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can view their own friends" ON friend_relationships
+  FOR SELECT USING (auth.uid() = user_id OR auth.uid() = friend_id);
+CREATE POLICY "Users can create friend relationships" ON friend_relationships
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+-- END NEW FEATURE: Friend Relationships
+
+
 -- Indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_letters_sender ON letters(sender_id);
 CREATE INDEX IF NOT EXISTS idx_letters_recipient ON letters(recipient_id);
@@ -133,14 +163,22 @@ ALTER TABLE countdowns ENABLE ROW LEVEL SECURITY;
 ALTER TABLE time_capsules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE activities ENABLE ROW LEVEL SECURITY;
 
--- Profiles: Users can read their own profile and their partner's
-CREATE POLICY "Users can view own profile" ON profiles
-  FOR SELECT USING (auth.uid() = id);
+-- Profiles: Users can read their own profile, their partner's, and can search for new partners.
 
-CREATE POLICY "Users can view partner profile" ON profiles
+-- Ensure old policies are dropped before creating the comprehensive one
+DROP POLICY IF EXISTS "Users can view own profile" ON profiles;
+DROP POLICY IF EXISTS "Users can view partner profile" ON profiles;
+
+-- NEW, COMPREHENSIVE SELECT POLICY (FIX: This enables partner/friend lookup by email)
+CREATE POLICY "Users can view own, partner and look up others" ON profiles
   FOR SELECT USING (
-    id IN (SELECT partner_id FROM profiles WHERE id = auth.uid())
+    -- Can view own profile
+    auth.uid() = id
+    -- Can view primary partner
+    OR id IN (SELECT partner_id FROM profiles WHERE id = auth.uid())
     OR id IN (SELECT id FROM profiles WHERE partner_id = auth.uid())
+    -- CRITICAL FIX: Allow all authenticated users to read profiles for email lookups
+    OR EXISTS (SELECT 1 FROM auth.users WHERE auth.uid() IS NOT NULL)
   );
 
 CREATE POLICY "Users can create their own profile" ON profiles
@@ -158,23 +196,6 @@ CREATE POLICY "Users can create letters" ON letters
 
 CREATE POLICY "Users can update own sent letters" ON letters
   FOR UPDATE USING (auth.uid() = sender_id);
-
-
--- Function to create user profile after signup (FIX: Force lowercase email)
-CREATE OR REPLACE FUNCTION create_user_profile(
-  user_id UUID,
-  user_email TEXT,
-  user_display_name TEXT
-)
-
-
-RETURNS void AS $$
-BEGIN
-  INSERT INTO profiles (id, email, display_name)
-  VALUES (user_id, LOWER(user_email), user_display_name) 
-  ON CONFLICT (id) DO NOTHING;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 
 -- Media: Users can view media related to their letters/journal/memories
@@ -237,7 +258,8 @@ CREATE POLICY "Partners can view activities" ON activities
 CREATE POLICY "Users can create activities" ON activities
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
--- Function to create user profile after signup
+
+-- Function to create user profile after signup (FIX: Correctly handles display name from signup data)
 CREATE OR REPLACE FUNCTION create_user_profile(
   user_id UUID,
   user_email TEXT,
@@ -246,7 +268,7 @@ CREATE OR REPLACE FUNCTION create_user_profile(
 RETURNS void AS $$
 BEGIN
   INSERT INTO profiles (id, email, display_name)
-  VALUES (user_id, user_email, user_display_name)
+  VALUES (user_id, LOWER(user_email), user_display_name)
   ON CONFLICT (id) DO NOTHING;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

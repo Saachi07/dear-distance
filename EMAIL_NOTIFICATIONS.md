@@ -11,10 +11,6 @@ Email notifications are currently **not fully implemented** due to limitations o
 - Services like Resend, SendGrid, or Mailgun offer free tiers
 - Requires setting up Edge Functions in Supabase
 
-### Option 2: Supabase Paid Plan
-- Supabase Pro plan includes more email quota
-- Can use Supabase's built-in email service
-- Better for production use
 
 ### Option 3: Third-Party Service
 - Integrate directly with services like:
