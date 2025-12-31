@@ -123,11 +123,6 @@ export default function DashboardPage() {
           <h1 className="text-4xl font-handwriting text-vintage-ink mb-2">
             Welcome back {profile?.display_name || 'there'} 
           </h1>
-          <p className="text-vintage-ink/70">
-            {profile?.partner_id
-              ? 'Connected with your partner • their updates land in Notifications'
-              : 'Connect with your partner in settings whenever you’re ready'}
-          </p>
         </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
