@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, Suspense } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { createSupabaseClient } from '@/lib/supabase/client'
 import { ArrowLeft, Loader } from 'lucide-react'
 import Link from 'next/link'
@@ -49,7 +49,7 @@ const getSingleProfile = (profiles: ProfileSubset | ProfileSubset[] | null): Pro
 function LetterContent() {
   const searchParams = useSearchParams()
   const letterId = searchParams.get('id')
-  const router = useRouter()
+  // FIX: Removed unused 'router'
   const supabase = createSupabaseClient()
   
   const [letter, setLetter] = useState<FullLetter | null>(null)
