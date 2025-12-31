@@ -7,12 +7,15 @@ import { createSupabaseClient } from '@/lib/supabase/client'
 import { encrypt, hashPassword, hashPassword as hashPuzzleAnswer } from '@/lib/encryption'
 import { LetterEditor } from '@/components/LetterEditor'
 import { createActivity } from '@/lib/notifications'
-import { Save, Lock, Calendar, EyeOff, ArrowLeft } from 'lucide-react'
+import { Save, Lock, Calendar, EyeOff, ArrowLeft, Heart, Home, Mail, CheckCircle } from 'lucide-react'
+import Link from 'next/link'
 
 export default function NewLetterPage() {
   const { user } = useUser()
   const router = useRouter()
   const supabase = createSupabaseClient()
+  
+  // Form State
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [recipientEmail, setRecipientEmail] = useState('')
@@ -22,12 +25,20 @@ export default function NewLetterPage() {
   const [scheduledDate, setScheduledDate] = useState('')
   const [loading, setLoading] = useState(false)
   const [media, setMedia] = useState<Array<{ type: string; url: string }>>([])
+  
+  // Letter Type State
   const [letterType, setLetterType] = useState<'regular' | 'open_when'>('regular')
   const [openWhenCondition, setOpenWhenCondition] = useState('')
+  
+  // Puzzle State
   const [hasPuzzle, setHasPuzzle] = useState(false)
   const [puzzleType, setPuzzleType] = useState<'riddle' | 'math' | 'word'>('riddle')
   const [puzzleQuestion, setPuzzleQuestion] = useState('')
   const [puzzleAnswer, setPuzzleAnswer] = useState('')
+
+  // Success State
+  const [isSuccess, setIsSuccess] = useState(false)
+  const [createdLetterId, setCreatedLetterId] = useState<string | null>(null)
 
   const handleSave = async () => {
     if (!user || !title || !content) {
@@ -99,7 +110,10 @@ export default function NewLetterPage() {
         })
       }
 
-      router.push(`/letters/${letter.id}`)
+      // Success! Show success screen instead of redirecting
+      setCreatedLetterId(letter.id)
+      setIsSuccess(true)
+
     } catch (error) {
       console.error('Error saving letter:', error)
       const message = error instanceof Error ? error.message : 'Failed to save letter'
@@ -109,6 +123,58 @@ export default function NewLetterPage() {
     }
   }
 
+  // --- SUCCESS VIEW ---
+  if (isSuccess && createdLetterId) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-soft-pink via-white to-dusty-blue flex items-center justify-center p-4">
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-12 text-center max-w-lg w-full border border-rose-gold/20 animate-fade-in">
+          <div className="mb-6 flex justify-center">
+            <div className="p-4 bg-green-100 rounded-full">
+              <CheckCircle className="w-16 h-16 text-green-600" />
+            </div>
+          </div>
+          
+          <h1 className="text-3xl font-handwriting text-vintage-ink mb-4">
+            Letter Sealed!
+          </h1>
+          
+          <p className="text-vintage-ink/70 mb-8 font-serif">
+            Your letter has been securely encrypted and saved. 
+            {scheduledDate 
+              ? ` It will be revealed on ${new Date(scheduledDate).toLocaleDateString()}.` 
+              : " It's ready to be opened."}
+          </p>
+
+          <div className="flex flex-col gap-3">
+            <Link
+              href={`/letters/view?id=${createdLetterId}`} // FIX: Correct query param link
+              className="flex items-center justify-center gap-2 px-6 py-3 bg-rose-gold text-white rounded-lg font-semibold hover:bg-rose-gold/90 transition-all shadow-md group"
+            >
+              <Mail className="w-5 h-5" />
+              View Letter
+            </Link>
+            
+            <Link
+              href="/dashboard"
+              className="flex items-center justify-center gap-2 px-6 py-3 bg-white border border-vintage-ink/20 text-vintage-ink rounded-lg font-semibold hover:bg-gray-50 transition-colors"
+            >
+              <Home className="w-5 h-5" />
+              Return to Dashboard
+            </Link>
+
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-2 text-sm text-vintage-ink/60 hover:text-rose-gold underline transition-colors"
+            >
+              Write another letter
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // --- REGULAR FORM VIEW ---
   return (
     <div className="min-h-screen bg-gradient-to-br from-soft-pink via-white to-dusty-blue py-8 px-4 pb-24 md:pb-8">
       <div className="max-w-4xl mx-auto">

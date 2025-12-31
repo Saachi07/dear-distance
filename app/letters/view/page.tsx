@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createSupabaseClient } from '@/lib/supabase/client'
-import { ArrowLeft, Loader } from 'lucide-react'
+import { ArrowLeft, Loader, Heart } from 'lucide-react'
 import Link from 'next/link'
 import { EnvelopeAnimation } from '@/components/EnvelopeAnimation'
 import { decrypt } from '@/lib/encryption'
@@ -45,18 +45,15 @@ const getSingleProfile = (profiles: ProfileSubset | ProfileSubset[] | null): Pro
   return Array.isArray(profiles) ? { display_name: 'Unknown User' } : profiles
 }
 
-// Inner component that reads the search params
 function LetterContent() {
   const searchParams = useSearchParams()
   const letterId = searchParams.get('id')
-  // FIX: Removed unused 'router'
   const supabase = createSupabaseClient()
   
   const [letter, setLetter] = useState<FullLetter | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Sub-component for the display logic
   const DisplayLetter = ({ letter, fullData }: { letter: Letter, fullData: FullLetter }) => {
     const initiallyOpened = fullData.opened_at !== null || fullData.is_unlocked;
     const [isOpened, setIsOpened] = useState(initiallyOpened)
@@ -98,7 +95,12 @@ function LetterContent() {
           />
         ) : (
           <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl p-8 max-w-2xl mx-auto">
-            <p className="text-xl font-serif whitespace-pre-wrap">{decryptedContent}</p>
+            {/* FIX: Render HTML content safely */}
+            <div 
+              className="text-lg font-serif text-vintage-ink leading-relaxed [&_p]:mb-4 [&_h1]:text-2xl [&_h1]:font-bold [&_h2]:text-xl [&_h2]:font-bold [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_blockquote]:border-l-4 [&_blockquote]:border-rose-gold/50 [&_blockquote]:pl-4 [&_blockquote]:italic"
+              dangerouslySetInnerHTML={{ __html: decryptedContent }} 
+            />
+            
             <div className="mt-8 pt-4 border-t border-vintage-ink/10 flex justify-between items-end">
               <div>
                 {fullData.opened_at && (
@@ -201,7 +203,6 @@ function LetterContent() {
   )
 }
 
-// Main Page Component
 export default function LetterPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-soft-pink via-white to-dusty-blue py-8 px-4 pb-24 md:pb-8">
