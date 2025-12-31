@@ -3,7 +3,8 @@
 import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createSupabaseClient } from '@/lib/supabase/client'
-import { ArrowLeft, Loader, Heart } from 'lucide-react'
+// FIX: Removed 'Heart' from imports
+import { ArrowLeft, Loader } from 'lucide-react'
 import Link from 'next/link'
 import { EnvelopeAnimation } from '@/components/EnvelopeAnimation'
 import { decrypt } from '@/lib/encryption'
@@ -203,6 +204,7 @@ function LetterContent() {
   )
 }
 
+// Main Page Component
 export default function LetterPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-soft-pink via-white to-dusty-blue py-8 px-4 pb-24 md:pb-8">

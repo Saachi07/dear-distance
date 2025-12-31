@@ -7,7 +7,8 @@ import { createSupabaseClient } from '@/lib/supabase/client'
 import { encrypt, hashPassword, hashPassword as hashPuzzleAnswer } from '@/lib/encryption'
 import { LetterEditor } from '@/components/LetterEditor'
 import { createActivity } from '@/lib/notifications'
-import { Save, Lock, Calendar, EyeOff, ArrowLeft, Heart, Home, Mail, CheckCircle } from 'lucide-react'
+// FIX: Removed 'Heart' from imports
+import { Save, Lock, Calendar, EyeOff, ArrowLeft, Home, Mail, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
 
 export default function NewLetterPage() {
@@ -147,7 +148,7 @@ export default function NewLetterPage() {
 
           <div className="flex flex-col gap-3">
             <Link
-              href={`/letters/view?id=${createdLetterId}`} // FIX: Correct query param link
+              href={`/letters/view?id=${createdLetterId}`}
               className="flex items-center justify-center gap-2 px-6 py-3 bg-rose-gold text-white rounded-lg font-semibold hover:bg-rose-gold/90 transition-all shadow-md group"
             >
               <Mail className="w-5 h-5" />
