@@ -20,7 +20,6 @@ interface Letter {
   sender_id: string
   created_at: string
   open_when: string | null
-  is_draft: boolean
   author: ProfileSubset
 }
 
@@ -29,36 +28,32 @@ interface FullLetter {
   title: string
   content_encrypted: string
   sender_id: string
-  recipient_id: string | null; // Added
+  recipient_id: string | null;
   created_at: string
   open_when_condition: string | null 
-  is_draft: boolean
   password_hash: string | null;
   scheduled_reveal_at: string | null;
   is_unlocked: boolean;
   opened_at: string | null;
-  author: ProfileSubset | ProfileSubset[] // Kept for robustness
-  recipient_profile: ProfileSubset | ProfileSubset[] | null // Added
+  author: ProfileSubset | ProfileSubset[] 
+  recipient_profile: ProfileSubset | ProfileSubset[] | null
 }
 
-// Helper to safely extract the display name from a joined field (which often returns as an array of length 1)
+// Helper to safely extract the display name
 const getSingleProfile = (profiles: ProfileSubset | ProfileSubset[] | null): ProfileSubset => {
   if (!profiles) return { display_name: 'Unknown User' }
   if (Array.isArray(profiles) && profiles.length > 0) {
     return profiles[0]
   }
-  // The type assertion ensures we treat non-array results correctly.
   return Array.isArray(profiles) ? { display_name: 'Unknown User' } : profiles
 }
 
-// Placeholder to replace the functionality of the missing LetterDetail component
 const LetterDetailPlaceholder = ({ letter, fullData }: { letter: Letter, fullData: FullLetter }) => {
   const [isOpened, setIsOpened] = useState(fullData.opened_at !== null || fullData.is_unlocked)
   const [isUnlocked, setIsUnlocked] = useState(fullData.is_unlocked)
   const [decryptedContent, setDecryptedContent] = useState(letter.content)
 
   const handleOpen = () => {
-    // Attempt to decrypt when opened
     try {
         const content = decrypt(fullData.content_encrypted);
         setDecryptedContent(content);
@@ -84,14 +79,28 @@ const LetterDetailPlaceholder = ({ letter, fullData }: { letter: Letter, fullDat
       ) : (
         <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl p-8 max-w-2xl mx-auto">
           <p className="text-xl font-serif whitespace-pre-wrap">{decryptedContent}</p>
-          <p className="mt-6 text-right text-vintage-ink/70">From: {senderProfile.display_name || 'Unknown Sender'} • Sent: {new Date(letter.created_at).toLocaleDateString()}</p>
-          {fullData.opened_at && <p className="text-right text-vintage-ink/60 text-sm">Opened: {new Date(fullData.opened_at).toLocaleDateString()}</p>}
+          <div className="mt-8 pt-4 border-t border-vintage-ink/10 flex justify-between items-end">
+            <div>
+              {fullData.opened_at && (
+                <p className="text-vintage-ink/60 text-sm">
+                  Opened: {new Date(fullData.opened_at).toLocaleDateString()}
+                </p>
+              )}
+            </div>
+            <div className="text-right">
+              <p className="text-vintage-ink/70 font-semibold">
+                From: {senderProfile.display_name || 'Unknown Sender'}
+              </p>
+              <p className="text-vintage-ink/60 text-sm">
+                Sent: {new Date(letter.created_at).toLocaleDateString()}
+              </p>
+            </div>
+          </div>
         </div>
       )}
     </>
   )
 }
-
 
 export default function LetterPage() {
   const params = useParams()
@@ -107,6 +116,8 @@ export default function LetterPage() {
 
     const fetchLetter = async () => {
       try {
+        // FIX 1: Removed 'is_draft' (not in your database)
+        // FIX 2: Used !sender_id and !recipient_id instead of long constraint names
         const { data, error: fetchError } = await supabase
           .from('letters')
           .select(`
@@ -117,25 +128,22 @@ export default function LetterPage() {
             recipient_id,
             created_at,
             open_when_condition,
-            is_draft,
             password_hash,
             scheduled_reveal_at,
             is_unlocked,
             opened_at,
-            author:profiles!letters_sender_id_fkey(display_name),
-            recipient_profile:profiles!letters_recipient_id_fkey(display_name)
+            author:profiles!sender_id(display_name),
+            recipient_profile:profiles!recipient_id(display_name)
           `)
           .eq('id', letterId)
           .single()
 
         if (fetchError) {
-          // This path often catches RLS violations or not-found errors
-          setError('Letter not found or access denied.')
-          console.error('Fetch error:', fetchError)
+          console.error('Fetch error details:', fetchError)
+          setError(fetchError.message || 'Letter not found or access denied.')
           return
         }
 
-        // Use a small helper to handle the array-wrapped join data safely
         const rawData = data as any;
         const authorProfile = getSingleProfile(rawData.author);
 
@@ -169,7 +177,9 @@ export default function LetterPage() {
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-soft-pink via-white to-dusty-blue px-4">
         <div className="text-center">
           <h1 className="text-3xl font-handwriting text-vintage-ink mb-4">Oops!</h1>
-          <p className="text-vintage-ink/70 mb-6">{error || 'Letter not found'}</p>
+          <p className="text-red-500 mb-6 bg-white/50 p-4 rounded-lg max-w-md mx-auto">
+            {error || 'Letter not found'}
+          </p>
           <Link
             href="/letters"
             className="inline-flex items-center gap-2 px-6 py-3 bg-rose-gold text-white rounded-lg font-semibold hover:bg-rose-gold/90 transition-all"
@@ -187,11 +197,10 @@ export default function LetterPage() {
   const formattedLetter: Letter = {
     id: letter.id,
     title: letter.title,
-    content: "Encrypted Content. Click to open.", // Placeholder before decryption
+    content: "Encrypted Content. Click to open.",
     sender_id: letter.sender_id,
     created_at: letter.created_at,
     open_when: letter.open_when_condition,
-    is_draft: letter.is_draft,
     author: senderProfile,
   }
 
