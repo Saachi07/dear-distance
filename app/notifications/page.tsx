@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useUser } from '@/app/providers'
 import { createSupabaseClient } from '@/lib/supabase/client'
-import { ArrowLeft, Bell, Mail, ImageIcon, BookOpen, Calendar, Heart } from 'lucide-react'
+import { ArrowLeft, Bell, Mail, ImageIcon, BookOpen, Heart } from 'lucide-react'
 import { format } from 'date-fns'
 import { fetchPartnerId } from '@/lib/partner'
 

@@ -18,7 +18,7 @@ export default function NotFound() {
         </h1>
         
         <p className="text-vintage-ink/70 mb-8 text-lg font-serif">
-          We couldn't find the page you were looking for. It might have moved or dissolved into a memory.
+          We couldn&apos;t find the page you were looking for. It might have moved or dissolved into a memory.
         </p>
 
         <div className="flex flex-col gap-3">

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useUser } from '@/app/providers'
 import { createSupabaseClient } from '@/lib/supabase/client'
-import { Save, User, Mail, Heart, Loader2, LogOut } from 'lucide-react'
+import { Save, User, Heart, Loader2, LogOut } from 'lucide-react'
 
 export default function SettingsPage() {
   const { user } = useUser()
@@ -100,6 +100,7 @@ export default function SettingsPage() {
       setMessage({ type: 'success', text: 'Profile updated successfully!' })
       setPartnerEmail('') // Clear email field on success
       
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.error('Update error:', error)
       setMessage({ type: 'error', text: error.message || 'Failed to update profile' })

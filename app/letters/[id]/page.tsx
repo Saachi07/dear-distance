@@ -49,9 +49,26 @@ const getSingleProfile = (profiles: ProfileSubset | ProfileSubset[] | null): Pro
 }
 
 const LetterDetailPlaceholder = ({ letter, fullData }: { letter: Letter, fullData: FullLetter }) => {
-  const [isOpened, setIsOpened] = useState(fullData.opened_at !== null || fullData.is_unlocked)
-  const [isUnlocked, setIsUnlocked] = useState(fullData.is_unlocked)
+  // Determine if the letter is already accessible (opened or unlocked)
+  const initiallyOpened = fullData.opened_at !== null || fullData.is_unlocked;
+
+  const [isOpened, setIsOpened] = useState(initiallyOpened)
+  // Removed unused setIsUnlocked
+  const [isUnlocked] = useState(fullData.is_unlocked)
   const [decryptedContent, setDecryptedContent] = useState(letter.content)
+
+  // Automatically decrypt if the letter is already open when the page loads
+  useEffect(() => {
+    if (initiallyOpened) {
+      try {
+        const content = decrypt(fullData.content_encrypted);
+        setDecryptedContent(content);
+      } catch (e) {
+        console.error("Auto-decryption failed:", e);
+        setDecryptedContent("Error decrypting content. Please check your ENCRYPTION_KEY.");
+      }
+    }
+  }, [initiallyOpened, fullData.content_encrypted]);
 
   const handleOpen = () => {
     try {
@@ -116,8 +133,6 @@ export default function LetterPage() {
 
     const fetchLetter = async () => {
       try {
-        // FIX 1: Removed 'is_draft' (not in your database)
-        // FIX 2: Used !sender_id and !recipient_id instead of long constraint names
         const { data, error: fetchError } = await supabase
           .from('letters')
           .select(`
@@ -144,6 +159,7 @@ export default function LetterPage() {
           return
         }
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const rawData = data as any;
         const authorProfile = getSingleProfile(rawData.author);
 

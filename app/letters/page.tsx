@@ -1,236 +1,165 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
-import { createSupabaseClient } from '@/lib/supabase/client'
-import { ArrowLeft, Loader } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { EnvelopeAnimation } from '@/components/EnvelopeAnimation'
-import { decrypt } from '@/lib/encryption'
+import { useUser } from '@/app/providers'
+import { createSupabaseClient } from '@/lib/supabase/client'
+import { Mail, Lock, Calendar, Plus, Heart, ArrowRight, ArrowLeft } from 'lucide-react'
 
-// Helper interfaces for type safety
 interface ProfileSubset {
-  display_name: string | null
+  display_name: string
 }
 
 interface Letter {
   id: string
   title: string
-  content: string 
   sender_id: string
+  recipient_id: string | null
+  scheduled_reveal_at: string | null
+  is_unlocked: boolean
+  opened_at: string | null
   created_at: string
-  open_when: string | null
-  author: ProfileSubset
+  sender: ProfileSubset | ProfileSubset[]
+  recipient: ProfileSubset | ProfileSubset[] | null
 }
 
-interface FullLetter {
-  id: string
-  title: string
-  content_encrypted: string
-  sender_id: string
-  recipient_id: string | null;
-  created_at: string
-  open_when_condition: string | null 
-  password_hash: string | null;
-  scheduled_reveal_at: string | null;
-  is_unlocked: boolean;
-  opened_at: string | null;
-  author: ProfileSubset | ProfileSubset[] 
-  recipient_profile: ProfileSubset | ProfileSubset[] | null
-}
-
-// Helper to safely extract the display name
-const getSingleProfile = (profiles: ProfileSubset | ProfileSubset[] | null): ProfileSubset => {
-  if (!profiles) return { display_name: 'Unknown User' }
+const getSingleProfile = (profiles: Letter['sender'] | Letter['recipient']): ProfileSubset | null => {
+  if (!profiles) return null
   if (Array.isArray(profiles) && profiles.length > 0) {
     return profiles[0]
   }
-  return Array.isArray(profiles) ? { display_name: 'Unknown User' } : profiles
+  return Array.isArray(profiles) ? null : profiles
 }
 
-const LetterDetailPlaceholder = ({ letter, fullData }: { letter: Letter, fullData: FullLetter }) => {
-  // Determine if the letter is already accessible (opened or unlocked)
-  const initiallyOpened = fullData.opened_at !== null || fullData.is_unlocked;
-
-  const [isOpened, setIsOpened] = useState(initiallyOpened)
-  const [isUnlocked, setIsUnlocked] = useState(fullData.is_unlocked)
-  const [decryptedContent, setDecryptedContent] = useState(letter.content)
-
-  // FIX: Automatically decrypt if the letter is already open when the page loads
-  useEffect(() => {
-    if (initiallyOpened) {
-      try {
-        const content = decrypt(fullData.content_encrypted);
-        setDecryptedContent(content);
-      } catch (e) {
-        console.error("Auto-decryption failed:", e);
-        setDecryptedContent("Error decrypting content. Please check your ENCRYPTION_KEY.");
-      }
-    }
-  }, [initiallyOpened, fullData.content_encrypted]);
-
-  // Handle manual opening (clicking the envelope)
-  const handleOpen = () => {
-    try {
-        const content = decrypt(fullData.content_encrypted);
-        setDecryptedContent(content);
-    } catch (e) {
-        setDecryptedContent("Error decrypting content. Check your ENCRYPTION_KEY.");
-        console.error(e);
-    }
-    setIsOpened(true);
-  }
-
-  const senderProfile = getSingleProfile(fullData.author);
-
-  return (
-    <>
-      <h1 className="text-4xl font-handwriting text-vintage-ink mb-6">{letter.title}</h1>
-
-      {!isOpened ? (
-        <EnvelopeAnimation 
-          openWhenText={fullData.open_when_condition || "Just Because"}
-          onOpen={handleOpen}
-          isUnlocked={isUnlocked}
-        />
-      ) : (
-        <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl p-8 max-w-2xl mx-auto">
-          <p className="text-xl font-serif whitespace-pre-wrap">{decryptedContent}</p>
-          <div className="mt-8 pt-4 border-t border-vintage-ink/10 flex justify-between items-end">
-            <div>
-              {fullData.opened_at && (
-                <p className="text-vintage-ink/60 text-sm">
-                  Opened: {new Date(fullData.opened_at).toLocaleDateString()}
-                </p>
-              )}
-            </div>
-            <div className="text-right">
-              <p className="text-vintage-ink/70 font-semibold">
-                From: {senderProfile.display_name || 'Unknown Sender'}
-              </p>
-              <p className="text-vintage-ink/60 text-sm">
-                Sent: {new Date(letter.created_at).toLocaleDateString()}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  )
-}
-
-export default function LetterPage() {
-  const params = useParams()
-  const letterId = params?.id as string
+export default function LettersPage() {
+  const { user } = useUser()
   const supabase = createSupabaseClient()
-  
-  const [letter, setLetter] = useState<FullLetter | null>(null)
+  const [letters, setLetters] = useState<Letter[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+
+  const loadLetters = useCallback(async () => {
+    if (!user) return
+
+    const { data, error } = await supabase
+      .from('letters')
+      .select(`
+        *,
+        sender:profiles!sender_id(display_name),
+        recipient:profiles!recipient_id(display_name)
+      `)
+      .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('Error loading letters:', error)
+    } else {
+      setLetters(data as Letter[] || [])
+    }
+    setLoading(false)
+  }, [supabase, user])
 
   useEffect(() => {
-    if (!letterId) return
-
-    const fetchLetter = async () => {
-      try {
-        const { data, error: fetchError } = await supabase
-          .from('letters')
-          .select(`
-            id,
-            title,
-            content_encrypted,
-            sender_id,
-            recipient_id,
-            created_at,
-            open_when_condition,
-            password_hash,
-            scheduled_reveal_at,
-            is_unlocked,
-            opened_at,
-            author:profiles!sender_id(display_name),
-            recipient_profile:profiles!recipient_id(display_name)
-          `)
-          .eq('id', letterId)
-          .single()
-
-        if (fetchError) {
-          console.error('Fetch error details:', fetchError)
-          setError(fetchError.message || 'Letter not found or access denied.')
-          return
-        }
-
-        const rawData = data as any;
-        const authorProfile = getSingleProfile(rawData.author);
-
-        const cleanedData: FullLetter = {
-            ...rawData,
-            author: authorProfile,
-        } as FullLetter;
-        
-        setLetter(cleanedData)
-      } catch (err) {
-        setError('Error loading letter')
-        console.error('Error:', err)
-      } finally {
-        setLoading(false)
-      }
+    if (user) {
+      loadLetters()
     }
-
-    fetchLetter()
-  }, [letterId, supabase])
+  }, [user, loadLetters])
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader className="w-8 h-8 animate-spin text-rose-gold" />
-      </div>
-    )
-  }
-
-  if (error || !letter) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-soft-pink via-white to-dusty-blue px-4">
-        <div className="text-center">
-          <h1 className="text-3xl font-handwriting text-vintage-ink mb-4">Oops!</h1>
-          <p className="text-red-500 mb-6 bg-white/50 p-4 rounded-lg max-w-md mx-auto">
-            {error || 'Letter not found'}
-          </p>
-          <Link
-            href="/letters"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-rose-gold text-white rounded-lg font-semibold hover:bg-rose-gold/90 transition-all"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            Back to Letters
-          </Link>
+        <div className="animate-pulse text-rose-gold">
+          <Heart className="w-16 h-16" />
         </div>
       </div>
     )
-  }
-  
-  const senderProfile = getSingleProfile(letter.author);
-
-  const formattedLetter: Letter = {
-    id: letter.id,
-    title: letter.title,
-    content: "Encrypted Content. Click to open.",
-    sender_id: letter.sender_id,
-    created_at: letter.created_at,
-    open_when: letter.open_when_condition,
-    author: senderProfile,
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-soft-pink via-white to-dusty-blue py-8 px-4 pb-24 md:pb-8">
       <div className="container mx-auto max-w-4xl">
         <Link
-          href="/letters"
-          className="mb-4 inline-flex items-center gap-2 text-vintage-ink/70 hover:text-vintage-ink transition-colors"
+          href="/dashboard"
+          className="mb-4 flex items-center gap-2 text-vintage-ink/70 hover:text-vintage-ink transition-colors w-fit"
         >
           <ArrowLeft className="w-5 h-5" />
-          Back to Letters
+          Back
         </Link>
+        
+        <div className="flex items-center justify-between mb-8">
+          <h1 className="text-4xl font-handwriting text-vintage-ink">My Letters</h1>
+          <Link
+            href="/letters/new"
+            className="flex items-center gap-2 px-6 py-3 bg-rose-gold text-white rounded-lg font-semibold hover:bg-rose-gold/90 transition-all shadow-lg"
+          >
+            <Plus className="w-5 h-5" />
+            New Letter
+          </Link>
+        </div>
 
-        <LetterDetailPlaceholder letter={formattedLetter} fullData={letter} />
+        {letters.length === 0 ? (
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-12 text-center">
+            <Mail className="w-16 h-16 mx-auto text-rose-gold mb-4" />
+            <h2 className="text-2xl font-semibold text-vintage-ink mb-2">No letters yet</h2>
+            <p className="text-vintage-ink/70 mb-6">Start writing your first letter!</p>
+            <Link
+              href="/letters/new"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-rose-gold text-white rounded-lg font-semibold hover:bg-rose-gold/90 transition-all"
+            >
+              <Plus className="w-5 h-5" />
+              Write Your First Letter
+            </Link>
+          </div>
+        ) : (
+          <div className="grid gap-4">
+            {letters.map((letter) => {
+              const senderProfile = getSingleProfile(letter.sender);
+              const recipientProfile = getSingleProfile(letter.recipient);
+              const isSent = letter.sender_id === user?.id;
+
+              return (
+                <Link
+                  key={letter.id}
+                  href={`/letters/${letter.id}`}
+                  className="bg-white/80 backdrop-blur-sm rounded-xl p-6 shadow-lg hover:shadow-xl transition-all group"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="text-xl font-semibold text-vintage-ink group-hover:text-rose-gold transition-colors">
+                          {letter.title}
+                        </h3>
+                        {!letter.is_unlocked && (
+                          <Lock className="w-5 h-5 text-rose-gold" />
+                        )}
+                        {letter.scheduled_reveal_at && new Date(letter.scheduled_reveal_at) > new Date() && (
+                          <Calendar className="w-5 h-5 text-rose-gold" />
+                        )}
+                      </div>
+                      <p className="text-vintage-ink/70 text-sm mb-2">
+                        {isSent
+                          ? `To: ${recipientProfile?.display_name || 'Unlisted Recipient'}`
+                          : `From: ${senderProfile?.display_name || 'Someone'}`}
+                      </p>
+                      <p className="text-vintage-ink/60 text-xs">
+                        {new Date(letter.created_at).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                        })}
+                        {letter.scheduled_reveal_at && (
+                          <span className="ml-2">
+                            • Unlocks: {new Date(letter.scheduled_reveal_at).toLocaleDateString()}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <ArrowRight className="w-5 h-5 text-vintage-ink/40 group-hover:text-rose-gold group-hover:translate-x-1 transition-all" />
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
+        )}
       </div>
     </div>
   )
