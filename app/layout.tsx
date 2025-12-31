@@ -7,8 +7,7 @@ import { Navigation } from '@/components/Navigation'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Dear Distance - For Long-Distance Love',
-  description: 'A personal, intimate letter-sharing website for long-distance partners',
+  title: 'Dear Distance - For Long-Distance',
 }
 
 export default function RootLayout({
