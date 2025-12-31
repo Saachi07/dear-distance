@@ -13,7 +13,7 @@ interface JournalEntry {
   content: string
   author_id: string
   created_at: string
-  author: { display_name: string; email: string }
+  author: { display_name: string; email: string } | null
 }
 
 export default function JournalPage() {
@@ -39,7 +39,7 @@ export default function JournalPage() {
       .from('journal_entries')
       .select(`
         *,
-        author:profiles!journal_entries_author_id_fkey(display_name, email)
+        author:profiles!author_id(display_name, email)
       `)
       .or(`author_id.eq.${user.id},partner_id.eq.${user.id}`)
       .or(`author_id.eq.${partnerId},partner_id.eq.${partnerId}`)

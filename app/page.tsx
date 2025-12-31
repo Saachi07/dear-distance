@@ -40,7 +40,7 @@ export default function Home() {
           
           <p className="text-xl text-vintage-ink/80 mb-12 max-w-2xl mx-auto">
             A personal, intimate space for long-distance partners to share letters, 
-            memories, and moments together—no matter the distance.
+            memories, and moments together.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">

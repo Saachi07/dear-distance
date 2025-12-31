@@ -63,8 +63,6 @@ export default function NotificationsPage() {
         return <ImageIcon className="w-5 h-5 text-rose-gold" />
       case 'journal_entry':
         return <BookOpen className="w-5 h-5 text-rose-gold" />
-      case 'time_capsule_created':
-        return <Calendar className="w-5 h-5 text-rose-gold" />
       default:
         return <Heart className="w-5 h-5 text-rose-gold" />
     }
@@ -83,8 +81,6 @@ export default function NotificationsPage() {
         return isOwnActivity ? 'You added a memory' : `${userName} added a new memory`
       case 'journal_entry':
         return isOwnActivity ? 'You wrote a journal entry' : `${userName} wrote a journal entry`
-      case 'time_capsule_created':
-        return isOwnActivity ? 'You created a time capsule' : `${userName} created a time capsule`
       default:
         return 'Something sweet happened'
     }

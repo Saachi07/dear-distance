@@ -50,8 +50,8 @@ export default function LettersPage() {
       .from('letters')
       .select(`
         *,
-        sender:profiles!letters_sender_id_fkey(display_name),
-        recipient:profiles!letters_recipient_id_fkey(display_name)
+        sender:profiles!sender_id(display_name),
+        recipient:profiles!recipient_id(display_name)
       `)
       .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
       .order('created_at', { ascending: false })
