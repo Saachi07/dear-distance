@@ -119,7 +119,7 @@ export default function LettersPage() {
               return (
                 <Link
                   key={letter.id}
-                  href={`/letters/${letter.id}`}
+                  href={`/letters/view?id=${letter.id}`}
                   className="bg-white/80 backdrop-blur-sm rounded-xl p-6 shadow-lg hover:shadow-xl transition-all group"
                 >
                   <div className="flex items-start justify-between">
