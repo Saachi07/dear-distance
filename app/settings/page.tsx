@@ -1,10 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useUser } from '@/app/providers'
 import { createSupabaseClient } from '@/lib/supabase/client'
-import { Save, User, Heart, Loader2, LogOut } from 'lucide-react'
+import { Save, User, Heart, Loader2, LogOut, ArrowLeft, Globe } from 'lucide-react'
 
 export default function SettingsPage() {
   const { user } = useUser()
@@ -14,9 +14,22 @@ export default function SettingsPage() {
   const [displayName, setDisplayName] = useState('')
   const [partnerEmail, setPartnerEmail] = useState('')
   const [partnerName, setPartnerName] = useState<string | null>(null)
+  // Initialize with browser's timezone as default
+  const [timezone, setTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone)
+  
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+
+  // Get all supported timezones from the browser
+  const allTimezones = useMemo(() => {
+    try {
+      return Intl.supportedValuesOf('timeZone')
+    } catch (e) {
+      console.error("Timezone API not supported", e)
+      return ['UTC'] // Fallback
+    }
+  }, [])
 
   // Load current profile
   const loadProfile = useCallback(async () => {
@@ -24,7 +37,7 @@ export default function SettingsPage() {
 
     const { data, error } = await supabase
       .from('profiles')
-      .select('display_name, partner_id')
+      .select('display_name, partner_id, timezone')
       .eq('id', user.id)
       .single()
 
@@ -32,6 +45,10 @@ export default function SettingsPage() {
       console.error('Error loading profile:', error)
     } else if (data) {
       setDisplayName(data.display_name || '')
+      // Use saved timezone if available, otherwise keep browser default
+      if (data.timezone) {
+        setTimezone(data.timezone)
+      }
       
       // If user has a partner, fetch partner's details
       if (data.partner_id) {
@@ -60,13 +77,16 @@ export default function SettingsPage() {
     setMessage(null)
 
     try {
-      // 1. Update Display Name
-      const { error: nameError } = await supabase
+      // 1. Update Profile (Name & Timezone)
+      const { error: profileError } = await supabase
         .from('profiles')
-        .update({ display_name: displayName })
+        .update({ 
+          display_name: displayName,
+          timezone: timezone 
+        })
         .eq('id', user.id)
 
-      if (nameError) throw nameError
+      if (profileError) throw profileError
 
       // 2. Handle Partner Connection (if email provided)
       if (partnerEmail.trim()) {
@@ -97,13 +117,13 @@ export default function SettingsPage() {
         await loadProfile()
       }
 
-      setMessage({ type: 'success', text: 'Profile updated successfully!' })
+      setMessage({ type: 'success', text: 'Settings saved successfully!' })
       setPartnerEmail('') // Clear email field on success
       
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.error('Update error:', error)
-      setMessage({ type: 'error', text: error.message || 'Failed to update profile' })
+      setMessage({ type: 'error', text: error.message || 'Failed to update settings' })
     } finally {
       setSaving(false)
     }
@@ -125,6 +145,13 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-soft-pink via-white to-dusty-blue py-8 px-4 pb-24 md:pb-8">
       <div className="container mx-auto max-w-2xl">
+        <button
+          onClick={() => router.back()}
+          className="mb-4 flex items-center gap-2 text-vintage-ink/70 hover:text-vintage-ink transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          Back
+        </button>
         <h1 className="text-4xl font-handwriting text-vintage-ink mb-8">Settings</h1>
 
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-8 mb-6">
@@ -142,6 +169,28 @@ export default function SettingsPage() {
                 className="w-full px-4 py-3 border border-vintage-ink/20 rounded-lg focus:ring-2 focus:ring-rose-gold focus:border-transparent outline-none"
                 placeholder="What should we call you?"
               />
+            </div>
+
+            {/* Timezone Section (New) */}
+            <div>
+              <label className="block text-sm font-medium text-vintage-ink mb-2 flex items-center gap-2">
+                <Globe className="w-4 h-4" />
+                Your Timezone
+              </label>
+              <select
+                value={timezone}
+                onChange={(e) => setTimezone(e.target.value)}
+                className="w-full px-4 py-3 border border-vintage-ink/20 rounded-lg focus:ring-2 focus:ring-rose-gold focus:border-transparent outline-none bg-white"
+              >
+                {allTimezones.map((tz) => (
+                  <option key={tz} value={tz}>
+                    {tz.replace(/_/g, ' ')}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-vintage-ink/60 mt-2">
+                This helps us show countdowns in your local time and compare it with your partner&apos;s time.
+              </p>
             </div>
 
             {/* Partner Connection Section */}
